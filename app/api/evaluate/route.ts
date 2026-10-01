@@ -5,13 +5,13 @@ import OpenAI from 'openai';
 // 🚀 Point the OpenAI SDK to OpenRouter to access massive Open-Source models!
 const openai = new OpenAI({
   baseURL: 'https://openrouter.ai/api/v1',
-  apiKey: process.env.OPENROUTER_API_KEY,
+  // 🎯 FIX: Provide a fallback dummy key so the Vercel build doesn't crash
+  apiKey: process.env.OPENROUTER_API_KEY || 'sk-or-dummy-key-for-build',
   defaultHeaders: {
-    'HTTP-Referer': 'http://localhost:3000', // Required by OpenRouter
-    'X-Title': 'Theocode Academy',
+    'HTTP-Referer': 'https://theocode-academy.vercel.app',
+    'X-Title': 'TheoCode Academy',
   },
 });
-
 export async function POST(request: Request) {
   try {
     const { userId, lessonId, submittedCode, language, challengePrompt } = await request.json();
