@@ -66,7 +66,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ squ
   }
 }
 
-export async function GET(request: Request, { params }: { params: Promise<{ squadId: string }> }) {
+export async function GET(request: Request) {
   try {
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

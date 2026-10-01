@@ -11,10 +11,9 @@ export async function verifyAdmin() {
     };
   }
 
-  // 🎯 FIX: currentUser() returns the user object directly, not { user }
   const user = await currentUser();
   
-  if (!user || user.publicMetadata?.isAdmin !== true) {
+  if (!user || (user.publicMetadata as any)?.isAdmin !== true) {
     return { 
       isAdmin: false, 
       error: NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 }) 

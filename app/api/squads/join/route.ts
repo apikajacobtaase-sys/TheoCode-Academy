@@ -31,14 +31,14 @@ export async function POST(request: Request) {
     }
 
         // Get user's name from Clerk (fallback to 'New Member')
-    let userName = 'New Member';
+        let userName = 'New Member';
     try {
       const { clerkClient } = await import('@clerk/nextjs/server');
       const client = await clerkClient();
       const clerkUser = await client.users.getUser(userId);
       userName = clerkUser.firstName || clerkUser.username || 'New Member';
     } catch (error) {
-      console.error('Failed to fetch user name from Clerk:', error);
+      console.error('Failed to fetch user name:', error);
     }
 
     await sql`
