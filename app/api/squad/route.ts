@@ -2,18 +2,20 @@ import { auth } from '@clerk/nextjs/server';
 import { neon } from '@neondatabase/serverless';
 import { NextResponse } from 'next/server';
 
-export async function POST(request: Request, { params }: { params: Promise<{ squadId: string }> }) {
+export async function POST(request: Request) {
   try {
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { squadId } = await params;
-    const { content, media_url, media_type, media_name, tempId } = await request.json();
+    const body = await request.json();
+    const { squadId, content, media_url, media_type, media_name, tempId } = body;
 
-    // DEBUG: Log what we received
+    if (!squadId) {
+      return NextResponse.json({ error: 'squadId is required' }, { status: 400 });
+    }
+
     console.log('📥 Received message data:', { content, media_url, media_type, media_name });
 
-    // Validate: must have either text OR media
     if ((!content || content.trim().length === 0) && !media_url) {
       return NextResponse.json({ error: 'Message must have text or media' }, { status: 400 });
     }
@@ -24,7 +26,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ squ
 
     const sql = neon(process.env.DATABASE_URL!);
 
-    // Verify membership
     const memberCheck = await sql`
       SELECT user_name FROM squad_members 
       WHERE squad_id = ${squadId} AND user_id = ${userId} AND status = 'approved'
@@ -34,7 +35,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ squ
       return NextResponse.json({ error: 'Not a member of this squad' }, { status: 403 });
     }
 
-    // Rate limiting
     const lastMessage = await sql`
       SELECT created_at FROM squad_messages 
       WHERE squad_id = ${squadId} AND sender_id = ${userId} 
@@ -48,7 +48,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ squ
       }
     }
 
-    // DEBUG: Log what we're about to insert
     console.log('📤 Inserting message with media:', { media_url, media_type, media_name });
 
     const message = await sql`
@@ -71,7 +70,14 @@ export async function GET(request: Request) {
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { squadId } = await params;
+    // 🎯 FIX: Get squadId from the URL query string instead of params
+    const { searchParams } = new URL(request.url);
+    const squadId = searchParams.get('squadId');
+
+    if (!squadId) {
+      return NextResponse.json({ error: 'squadId is required' }, { status: 400 });
+    }
+
     const sql = neon(process.env.DATABASE_URL!);
 
     const memberCheck = await sql`

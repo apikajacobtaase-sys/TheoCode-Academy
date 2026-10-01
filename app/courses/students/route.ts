@@ -2,12 +2,19 @@ import { auth } from '@clerk/nextjs/server';
 import { neon } from '@neondatabase/serverless';
 import { NextResponse } from 'next/server';
 
-export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request) {
   try {
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { id } = await params;
+    // 🎯 FIX: Get the course ID from the URL query string instead of params
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'Course ID is required' }, { status: 400 });
+    }
+
     const sql = neon(process.env.DATABASE_URL!);
 
     // Verify this user is the course creator
@@ -66,9 +73,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     // Calculate overall stats
     const totalStudents = enrichedStudents.length;
     const completedStudents = enrichedStudents.filter(s => s.has_certificate).length;
-   const averageScore = totalStudents > 0 
-  ? Math.round(enrichedStudents.reduce((sum, s) => sum + ((s as any).average_score || 0), 0) / totalStudents)
-  : 0;
+    
+    const averageScore = totalStudents > 0 
+      ? Math.round(enrichedStudents.reduce((sum, s) => sum + ((s as any).average_score || 0), 0) / totalStudents)
+      : 0;
 
     return NextResponse.json({
       courseTitle: course[0]?.title || 'Course',
