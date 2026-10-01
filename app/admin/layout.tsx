@@ -75,7 +75,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <h1 className="text-lg font-bold text-white">
             {navItems.find(item => pathname.startsWith(item.href))?.name || 'Admin Panel'}
           </h1>
-          <UserButton afterSignOutUrl="/" />
+          <UserButton />
         </header>
 
         {/* Page Content */}
