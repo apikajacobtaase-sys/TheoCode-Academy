@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 
 export async function verifyAdmin() {
   const { userId } = await auth();
+if (!userId) return false;
   
   if (!userId) {
     return { isAdmin: false, error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };

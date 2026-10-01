@@ -94,8 +94,7 @@ export function SmartNavigation() {
                   </Link>
                 </div>
               )}
-
-              <UserButton afterSignOutUrl="/" />
+                        <UserButton signOutOptions={{ redirectUrl: '/' }} />
             </>
           ) : (
             <Link

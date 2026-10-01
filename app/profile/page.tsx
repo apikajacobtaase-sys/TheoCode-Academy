@@ -34,9 +34,9 @@ export default function ProfilePage() {
       if (res.ok) {
         const data = await res.json();
         setFormData({
-          full_name: data.profile.full_name || user.fullName || '',
-          username: data.profile.username || user.username || '',
-          profile_image_url: data.profile.profile_image_url || user.imageUrl || '',
+          full_name: data.profile.full_name || user?.fullName || '',
+          username: data.profile.username || user?.username || '',
+          profile_image_url: data.profile.profile_image_url || user?.imageUrl || '',
           is_name_verified: data.profile.is_name_verified || false
         });
       }

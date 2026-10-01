@@ -2,8 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import Cropper from 'react-easy-crop';
-import { Area, Point } from 'react-easy-crop/types';
-
+import { Area, Point } from 'react-easy-crop';
 interface ImageCropperProps {
   imageSrc: string;
   onCropComplete: (croppedImage: string) => void;

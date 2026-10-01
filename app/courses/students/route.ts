@@ -66,9 +66,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     // Calculate overall stats
     const totalStudents = enrichedStudents.length;
     const completedStudents = enrichedStudents.filter(s => s.has_certificate).length;
-    const averageScore = totalStudents > 0 
-      ? Math.round(enrichedStudents.reduce((sum, s) => sum + (s.average_score || 0), 0) / totalStudents)
-      : 0;
+   const averageScore = totalStudents > 0 
+  ? Math.round(enrichedStudents.reduce((sum, s) => sum + ((s as any).average_score || 0), 0) / totalStudents)
+  : 0;
 
     return NextResponse.json({
       courseTitle: course[0]?.title || 'Course',
