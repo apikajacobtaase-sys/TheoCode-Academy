@@ -30,19 +30,21 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    // Get user's name from Clerk (fallback to 'New Member')
+        // Get user's name from Clerk (fallback to 'New Member')
     let userName = 'New Member';
     try {
-      const { getUser } = await import('@clerk/nextjs/server');
-      const clerkUser = await getUser(userId);
-      userName = clerkUser?.firstName || clerkUser?.username || 'New Member';
-    } catch {}
+      const { clerkClient } = await import('@clerk/nextjs/server');
+      const client = await clerkClient();
+      const clerkUser = await client.users.getUser(userId);
+      userName = clerkUser.firstName || clerkUser.username || 'New Member';
+    } catch (error) {
+      console.error('Failed to fetch user name from Clerk:', error);
+    }
 
     await sql`
       INSERT INTO squad_members (squad_id, user_id, user_name, role, status)
       VALUES (${squad[0].id}, ${userId}, ${userName}, 'member', 'pending')
     `;
-
     // 🎉 Notify the leader with a join request message (visible in chat)
     await sql`
       INSERT INTO squad_messages (squad_id, sender_id, sender_name, content, status, is_system_message)

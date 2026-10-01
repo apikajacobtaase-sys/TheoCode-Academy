@@ -32,13 +32,17 @@ export async function PUT(request: Request) {
     const { full_name, username, profile_image_url, is_name_verified } = await request.json();
     const sql = neon(process.env.DATABASE_URL!);
 
-    // 🎯 Sync to Clerk
-    const clerk = await clerkClient();
-    await clerk.users.updateUser(userId, {
-      firstName: full_name.split(' ')[0] || '',
-      lastName: full_name.split(' ').slice(1).join(' ') || '',
-      imageUrl: profile_image_url || undefined
-    });
+    // 🎯 Sync to Clerk (Safely wrapped in try/catch so it doesn't break the DB save)
+    try {
+      const clerk = await clerkClient();
+      const nameParts = full_name ? full_name.split(' ') : [];
+      await clerk.users.updateUser(userId, {
+        firstName: nameParts[0] || '',
+        lastName: nameParts.slice(1).join(' ') || '',
+      });
+    } catch (clerkError) {
+      console.warn('Clerk sync warning (non-fatal):', clerkError);
+    }
 
     // 🎯 Save to our database
     await sql`

@@ -7,12 +7,13 @@ import Link from 'next/link';
 export default function Courses() {
   const { user, isLoaded } = useUser();
   const [courses, setCourses] = useState<any[]>([]);
-  const [enrolledCourseIds, setEnrolledCourseIds] = useState<Set<string>>(new Set());
+  
+  // 🎯 FIX 1: Explicitly type the Set as Set<string>
+  const [enrolledCourseIds, setEnrolledCourseIds] = useState<Set<string>>(new Set<string>());
   const [loadingEnroll, setLoadingEnroll] = useState<string | null>(null);
   const [loadingCourses, setLoadingCourses] = useState(true);
 
   useEffect(() => {
-    // Fetch courses from PUBLIC endpoint (no admin auth required)
     fetch('/api/courses')
       .then(res => {
         if (!res.ok) throw new Error('Failed to fetch courses');
@@ -37,7 +38,8 @@ export default function Courses() {
           return res.json();
         })
         .then(data => {
-          const ids = new Set((data.enrollments || []).map((e: any) => e.course_id));
+          // 🎯 FIX 2: Explicitly type the new Set as Set<string>
+          const ids = new Set<string>((data.enrollments || []).map((e: any) => String(e.course_id)));
           setEnrolledCourseIds(ids);
         })
         .catch(error => {
@@ -57,7 +59,7 @@ export default function Courses() {
       });
       const data = await res.json();
       if (data.enrolled) {
-        setEnrolledCourseIds(new Set([...enrolledCourseIds, courseId]));
+        setEnrolledCourseIds(new Set<string>([...enrolledCourseIds, courseId]));
       }
     } catch (error) {
       console.error('Enrollment error:', error);
@@ -94,11 +96,12 @@ export default function Courses() {
                     </span>
                     <h3 className="text-xl font-bold mt-4 mb-2">{course.title}</h3>
                     <p className="text-gray-400 text-sm line-clamp-3 mb-4">{course.description}</p>
-                   // Find the part that shows module/lesson counts and update it to:
-<div className="flex gap-4 text-sm text-gray-400 mb-4">
-  <span>📚 {course.module_count || 0} modules</span>
-  <span>📖 {course.lesson_count || 0} lessons</span>
-</div>
+                    
+                    {/* 🎯 FIX 3: Clean JSX for module/lesson counts (no stray comments) */}
+                    <div className="flex gap-4 text-sm text-gray-400 mb-4">
+                      <span>📚 {course.module_count || 0} modules</span>
+                      <span>📖 {course.lesson_count || 0} lessons</span>
+                    </div>
                   </div>
 
                   <div className="p-6 pt-0 mt-auto">
