@@ -1,5 +1,5 @@
-import { neon } from '@neondatabase/serverless';
 import { NextResponse } from 'next/server';
+import { neon } from '@neondatabase/serverless';
 
 export async function GET(
   request: Request,
@@ -7,26 +7,55 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    
-    if (!id) {
-      return NextResponse.json({ error: 'Course ID is required' }, { status: 400 });
-    }
-
     const sql = neon(process.env.DATABASE_URL!);
 
-    const course = await sql`
-      SELECT * FROM courses WHERE id = ${id} LIMIT 1
+    // 🎯 1. Fetch course details (only if published)
+    const [course] = await sql`
+      SELECT id, title, description, difficulty, category, language, duration_hours, total_lessons, instructor, image_url
+      FROM courses 
+      WHERE id = ${id} AND is_published = true
     `;
 
-    if (course.length === 0) {
-      console.warn(`⚠️ Course with ID ${id} not found in database`);
+    if (!course) {
       return NextResponse.json({ error: 'Course not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ course: course[0] });
+    // 🎯 2. Fetch lessons
+    const lessons = await sql`
+      SELECT id, title, description, duration_minutes, order_index
+      FROM lessons 
+      WHERE course_id = ${id} 
+      ORDER BY order_index
+    `;
 
+    // 🎯 3. Fetch items for each lesson
+    for (const lesson of lessons) {
+      const items = await sql`
+        SELECT id, item_type, title, content, file_url, metadata
+        FROM lesson_items 
+        WHERE lesson_id = ${lesson.id} 
+        ORDER BY order_index
+      `;
+      
+      // 🎯 4. If it's a quiz, fetch its questions
+      for (const item of items) {
+            // 🎯 If it's a quiz, fetch its questions (WITHOUT correct_answer!)
+      if (item.item_type === 'quiz') {
+        const questions = await sql`
+          SELECT id, question_text, options, explanation, order_index
+          FROM quiz_questions 
+          WHERE item_id = ${item.id} 
+          ORDER BY order_index
+        `;
+        item.questions = questions;
+      }
+      }
+      lesson.items = items;
+    }
+
+    return NextResponse.json({ course, lessons });
   } catch (error: any) {
-    console.error('❌ Course [id] API Error:', error.message);
-    return NextResponse.json({ error: error.message, course: null }, { status: 500 });
+    console.error('❌ Course GET Error:', error);
+    return NextResponse.json({ error: 'Failed to fetch course' }, { status: 500 });
   }
 }

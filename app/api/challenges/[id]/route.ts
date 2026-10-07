@@ -2,60 +2,46 @@ import { auth } from '@clerk/nextjs/server';
 import { neon } from '@neondatabase/serverless';
 import { NextResponse } from 'next/server';
 
-// 🎯 Simple UUID validation to prevent database crashes
-const isValidUUID = (id: string) => {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-};
-
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await auth();
-    const { id } = await params;
-
-    // 🎯 Reject invalid IDs immediately with a 400 error instead of crashing the DB
-    if (!id || !isValidUUID(id)) {
-      return NextResponse.json({ error: 'Invalid challenge ID format. Must be a UUID.' }, { status: 400 });
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const { id } = await params;
 
     const sql = neon(process.env.DATABASE_URL!);
 
-    const challengeResult = await sql`
+    const challenge = await sql`
       SELECT 
-        id, title, description, difficulty, language, starter_code, 
-        solution_code, test_cases, prompt, creator_id, expected_output, 
-        hints, category, points, created_at
-      FROM challenges
-      WHERE id = ${id}
-      LIMIT 1
+        c.id,
+        c.title,
+        c.description,
+        c.category,
+        c.difficulty,
+        c.points,
+        c.language,
+        c.starter_code,
+        COALESCE(cp.status, 'not_started') as user_status
+      FROM challenges c
+      LEFT JOIN challenge_progress cp ON c.id = cp.challenge_id AND cp.user_id = ${userId}
+      WHERE c.id = ${id} AND c.is_active = true
     `;
 
-    if (challengeResult.length === 0) {
+    if (challenge.length === 0) {
       return NextResponse.json({ error: 'Challenge not found' }, { status: 404 });
     }
 
-    const challenge = challengeResult[0];
-
-    let userSubmission = null;
-    if (userId) {
-      const submissionResult = await sql`
-        SELECT id, status, submitted_at, code
-        FROM challenge_submissions
-        WHERE challenge_id = ${id} AND user_id = ${userId}
-        ORDER BY submitted_at DESC
-        LIMIT 1
-      `;
-      if (submissionResult.length > 0) {
-        userSubmission = submissionResult[0];
-      }
-    }
-
-    return NextResponse.json({ challenge, userSubmission });
-
+    return NextResponse.json({
+      success: true,
+      challenge: challenge[0]
+    });
   } catch (error: any) {
-    console.error('❌ Challenge API Error:', error.message);
+    console.error('❌ Challenge GET Error:', error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

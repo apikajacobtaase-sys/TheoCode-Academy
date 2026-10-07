@@ -2,88 +2,100 @@ import { auth } from '@clerk/nextjs/server';
 import { neon } from '@neondatabase/serverless';
 import { NextResponse } from 'next/server';
 
-// DELETE: Leader deletes the entire squad
-export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+// 🎯 GET: Fetch messages for the squad
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ squadId?: string; id?: string }> }
+) {
   try {
     const { userId } = await auth();
-    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const { id } = await params;
-    const sql = neon(process.env.DATABASE_URL!);
-
-    // 🔒 SECURITY: Verify user is the leader
-    const leaderCheck = await sql`
-      SELECT 1 FROM squad_members 
-      WHERE squad_id = ${id} AND user_id = ${userId} AND role = 'leader' AND status = 'approved'
-    `;
-
-    if (leaderCheck.length === 0) {
-      return NextResponse.json({ error: 'Only the squad leader can delete the squad' }, { status: 403 });
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Delete the squad (CASCADE will delete all members and messages)
-    await sql`DELETE FROM squads WHERE id = ${id}`;
+    const resolvedParams = await params;
+    const squadId = resolvedParams.squadId || resolvedParams.id;
 
-    console.log(`✅ Squad ${id} deleted by leader ${userId}`);
-    return NextResponse.json({ success: true, message: 'Squad deleted successfully' });
+    if (!squadId) {
+      return NextResponse.json({ error: 'Missing squad ID' }, { status: 400 });
+    }
+
+    const sql = neon(process.env.DATABASE_URL!);
+
+    const memberCheck = await sql`
+      SELECT 1 FROM squad_members 
+      WHERE squad_id = ${squadId} AND user_id = ${userId} AND status = 'approved'
+    `;
+
+    if (memberCheck.length === 0) {
+      return NextResponse.json({ error: 'Not a member of this squad' }, { status: 403 });
+    }
+
+    const messages = await sql`
+      SELECT id, sender_id, sender_name, content, media_url, media_type, media_name, status, created_at, reply_to_id
+      FROM squad_messages 
+      WHERE squad_id = ${squadId} 
+      ORDER BY created_at ASC 
+      LIMIT 100
+    `;
+
+    return NextResponse.json({ messages });
   } catch (error: any) {
-    console.error('DELETE Squad Error:', error.message);
+    console.error('❌ MESSAGES API GET Error:', error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
-// POST: Member leaves the squad
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+// 🎯 POST: Send a new message to the squad
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ squadId?: string; id?: string }> }
+) {
   try {
     const { userId } = await auth();
-    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const { id } = await params;
-    const { action } = await request.json();
-
-    if (action !== 'leave') {
-      return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const resolvedParams = await params;
+    const squadId = resolvedParams.squadId || resolvedParams.id;
+
+    if (!squadId) {
+      return NextResponse.json({ error: 'Missing squad ID' }, { status: 400 });
+    }
+
+    const { content, message_type, file_data, file_name, file_size, file_mime, reply_to_id } = await request.json();
 
     const sql = neon(process.env.DATABASE_URL!);
 
-    // 🔒 SECURITY: Verify user is a member
+    // 1. Verify membership and get user's name
     const memberCheck = await sql`
-      SELECT role, user_name FROM squad_members 
-      WHERE squad_id = ${id} AND user_id = ${userId} AND status = 'approved'
+      SELECT user_name FROM squad_members 
+      WHERE squad_id = ${squadId} AND user_id = ${userId} AND status = 'approved'
     `;
 
     if (memberCheck.length === 0) {
-      return NextResponse.json({ error: 'You are not a member of this squad' }, { status: 403 });
+      return NextResponse.json({ error: 'Not a member of this squad' }, { status: 403 });
     }
 
-    // 🔒 SECURITY: Prevent leader from leaving (they must delete or transfer leadership)
-    if (memberCheck[0].role === 'leader') {
-      return NextResponse.json({ 
-        error: 'As the leader, you must delete the squad or transfer leadership before leaving' 
-      }, { status: 403 });
-    }
+    const userName = memberCheck[0].user_name || 'Unknown';
 
-    // Send a system message announcing the departure
-    await sql`
-      INSERT INTO squad_messages (squad_id, sender_id, sender_name, content, status, is_system_message)
-      VALUES (
-        ${id}, 
-        ${userId}, 
-        'System', 
-        ${`👋 ${memberCheck[0].user_name} has left the squad`}, 
-        'sent', 
-        true
+    // 2. Insert the new message into the database
+    const newMessage = await sql`
+      INSERT INTO squad_messages (
+        squad_id, sender_id, sender_name, content, message_type, 
+        media_url, media_type, media_name, reply_to_id, status
       )
+      VALUES (
+        ${squadId}, ${userId}, ${userName}, ${content || ''}, ${message_type || 'text'},
+        ${file_data || null}, ${file_mime || null}, ${file_name || null}, ${reply_to_id || null}, 'sent'
+      )
+      RETURNING id, sender_id, sender_name, content, media_url, media_type, media_name, status, created_at, reply_to_id
     `;
 
-    // Remove the member
-    await sql`DELETE FROM squad_members WHERE squad_id = ${id} AND user_id = ${userId}`;
-
-    console.log(`✅ User ${userId} left squad ${id}`);
-    return NextResponse.json({ success: true, message: 'You have left the squad' });
+    return NextResponse.json({ success: true, message: newMessage[0] });
   } catch (error: any) {
-    console.error('Leave Squad Error:', error.message);
+    console.error('❌ MESSAGES API POST Error:', error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

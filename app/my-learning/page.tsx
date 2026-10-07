@@ -3,114 +3,62 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useUser } from '@clerk/nextjs';
-import ProgressBar from '@/components/ProgressBar';
 
 export default function MyLearningPage() {
-  const { user, isLoaded } = useUser();
-  const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
+  const { isLoaded, isSignedIn } = useUser();
+  const [enrollments, setEnrollments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (isLoaded && user) {
-      fetchEnrolledCourses();
+    if (isSignedIn) {
+      fetch('/api/my-learning').then(r => r.json()).then(data => {
+        setEnrollments(data.enrollments || []);
+        setLoading(false);
+      });
     }
-  }, [isLoaded, user]);
-
-  const fetchEnrolledCourses = async () => {
-    try {
-      const res = await fetch('/api/my-learning');
-      if (res.ok) {
-        const data = await res.json();
-        setEnrolledCourses(data.courses || []);
-      }
-    } catch (error) {
-      console.error('Failed to fetch enrolled courses:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [isSignedIn]);
 
   if (!isLoaded || loading) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-green-400 animate-pulse text-xl">Loading your courses...</div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white p-8">
-        <h1 className="text-2xl font-bold mb-4">Please sign in to view your learning</h1>
-      </div>
-    );
+    return <div className="min-h-screen bg-black flex items-center justify-center text-green-400 animate-pulse">Loading...</div>;
   }
 
   return (
-    <main className="min-h-screen bg-black text-white p-4 sm:p-6 lg:p-8">
-      <div className="container mx-auto max-w-6xl">
-        
-        <div className="mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold mb-2">📖 My Learning</h1>
-          <p className="text-gray-400">
-            Track your progress and continue where you left off.
-          </p>
+    <main className="min-h-screen bg-black text-white pb-20">
+      <div className="bg-gray-900 border-b border-gray-800 px-6 py-6">
+        <div className="max-w-7xl mx-auto">
+          <h1 className="text-3xl font-bold">📚 My Learning</h1>
+          <p className="text-gray-400 mt-1">Track your course progress</p>
         </div>
+      </div>
 
-        {enrolledCourses.length === 0 ? (
-          <div className="bg-gray-900 rounded-2xl p-16 text-center border border-gray-800 border-dashed">
-            <div className="text-6xl mb-4">📚</div>
-            <h2 className="text-2xl font-bold mb-2 text-white">No courses yet</h2>
-            <p className="text-gray-400 mb-8">Start your learning journey by enrolling in a course!</p>
-            <Link 
-              href="/explore" 
-              className="inline-block px-8 py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold transition"
-            >
-              Explore Courses
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {enrollments.length === 0 ? (
+          <div className="text-center py-20">
+            <div className="text-6xl mb-4">📭</div>
+            <p className="text-xl text-gray-400 mb-4">You haven't enrolled in any courses yet</p>
+            <Link href="/courses" className="px-6 py-3 bg-green-600 hover:bg-green-500 rounded-lg font-bold transition">
+              Browse Courses
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {enrolledCourses.map((course) => (
-              <Link
-                key={course.id}
-                href={`/courses/${course.id}`}
-                className="bg-gray-900 border border-gray-800 rounded-2xl p-6 hover:border-green-500/50 transition-all group"
-              >
-                <h3 className="text-xl font-bold text-white mb-2 group-hover:text-green-400 transition">
-                  {course.title}
-                </h3>
-                
-                <p className="text-sm text-gray-400 mb-4 line-clamp-2">
-                  {course.description}
-                </p>
-
-                <div className="mb-4">
-                  <ProgressBar 
-                    progress={course.progress || 0} 
-                    label={`${course.completed_lessons || 0} of ${course.total_lessons || 0} lessons`}
-                    size="md"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-500">
-                    Enrolled {new Date(course.enrolled_at).toLocaleDateString()}
-                  </span>
-                  
-                  {course.progress === 100 ? (
-                    <span className="text-xs bg-green-600 text-white px-3 py-1 rounded-full font-bold">
-                      ✅ Completed
-                    </span>
-                  ) : course.progress > 0 ? (
-                    <span className="text-xs bg-green-600/20 text-green-400 px-3 py-1 rounded-full font-bold">
-                      In Progress
-                    </span>
-                  ) : (
-                    <span className="text-xs bg-gray-700 text-gray-300 px-3 py-1 rounded-full font-bold">
-                      Not Started
-                    </span>
-                  )}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {enrollments.map((e) => (
+              <Link key={e.course_id} href={`/courses/${e.course_id}`} className="group">
+                <div className="bg-gray-900/50 border border-gray-800 rounded-2xl overflow-hidden hover:border-green-500/50 transition">
+                  <div className="h-32 bg-gradient-to-br from-purple-600 to-blue-600"></div>
+                  <div className="p-5">
+                    <h3 className="font-bold text-lg text-white mb-2 group-hover:text-green-400 transition">{e.title}</h3>
+                    <div className="mb-3">
+                      <div className="flex justify-between text-xs text-gray-400 mb-1">
+                        <span>Progress</span>
+                        <span>{e.progress_percentage}%</span>
+                      </div>
+                      <div className="w-full bg-gray-800 rounded-full h-2">
+                        <div className="bg-green-500 h-2 rounded-full transition-all" style={{ width: `${e.progress_percentage}%` }}></div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500">Enrolled {new Date(e.enrolled_at).toLocaleDateString()}</p>
+                  </div>
                 </div>
               </Link>
             ))}

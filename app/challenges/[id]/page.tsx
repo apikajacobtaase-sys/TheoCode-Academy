@@ -4,285 +4,205 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useUser } from '@clerk/nextjs';
-import Editor from '@monaco-editor/react'; // 🎯 Import is safely at the top
+import Editor from '@monaco-editor/react';
+import { useToast } from '@/components/Toast'; // 🎯 Import the toast hook
 
-export default function ChallengeDetailPage() {
-  const { id: challengeId } = useParams();
-  const { user, isLoaded } = useUser();
-  
+export default function ChallengeEditorPage() {
+  const { id } = useParams();
+  const { isLoaded, isSignedIn } = useUser();
+  const { showToast } = useToast(); // 🎯 Initialize the toast hook
+
   const [challenge, setChallenge] = useState<any>(null);
-  const [userSubmission, setUserSubmission] = useState<any>(null);
-  const [code, setCode] = useState<string>('');
+  const [code, setCode] = useState('');
   const [loading, setLoading] = useState(true);
-  const [running, setRunning] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [output, setOutput] = useState<string>('');
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [isConsoleOpen, setIsConsoleOpen] = useState(false);
+  const [results, setResults] = useState<any>(null);
 
   useEffect(() => {
-    if (challengeId) {
-      fetchChallenge();
+    if (isSignedIn && id) {
+      fetch(`/api/challenges/${id}`).then(r => r.json()).then(data => {
+        if (data.success) {
+          setChallenge(data.challenge);
+          setCode(data.challenge.starter_code || '// Write your code here\n\n');
+        }
+        setLoading(false);
+      });
     }
-  }, [challengeId]);
+  }, [isSignedIn, id]);
 
-  const fetchChallenge = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/challenges/${challengeId}`);
-      
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || `Failed to fetch: ${res.status}`);
-      }
-      
-      const data = await res.json();
-      setChallenge(data.challenge);
-      setUserSubmission(data.userSubmission);
-      setCode(data.challenge.starter_code || '// Write your solution here...\n');
-    } catch (err: any) {
-      setError(err.message || 'Failed to load challenge.');
-    } finally {
-      setLoading(false);
-    }
-  };
-  const handleRunCode = async () => {
-    if (!code.trim()) {
-      setOutput('⚠️ Please write some code first!');
-      return;
-    }
-
-    setRunning(true);
-    setOutput('⏳ Executing code in the secure sandbox...');
-    setError(null);
+  const handleExecute = async (mode: 'run' | 'submit') => {
+    if (!code.trim()) return;
+    setIsExecuting(true);
+    setIsConsoleOpen(true); 
+    setResults({ status: 'running', message: mode === 'run' ? 'Running public tests...' : 'Submitting and grading all tests...' });
 
     try {
-      const res = await fetch(`/api/challenges/${challengeId}/run`, {
+      const res = await fetch(`/api/challenges/${id}/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, language: challenge.language })
+        body: JSON.stringify({ code: code.trim(), mode })
       });
-
       const data = await res.json();
-      
-      if (res.ok) {
-        setOutput(data.output || 'Code executed successfully (no output).');
-      } else {
-        // 🎯 This will now show the EXACT error from the server
-        setOutput(`❌ Execution failed: ${data.error || data.output || 'Unknown error'}`);
-      }
-    } catch (err: any) {
-      setOutput(`❌ Network Error: ${err.message}`);
-    } finally {
-      setRunning(false);
-    }
-  };
+      setResults(data);
 
-  const handleSubmit = async () => {
-    if (!user) {
-      setError('Please sign in to submit your solution.');
-      return;
-    }
-
-    if (!code.trim()) {
-      setError('Please write some code before submitting.');
-      return;
-    }
-
-    setSubmitting(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      const res = await fetch(`/api/challenges/${challengeId}/submit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code })
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Failed to submit solution.');
-      }
-
-      const data = await res.json();
-      
+      // 🎯 Show toast based on result
       if (data.status === 'accepted') {
-        setSuccess('🎉 Congratulations! Your solution was accepted!');
-        setUserSubmission(data.submission);
-      } else {
-        setError(`❌ Submission failed: ${data.message || 'Your code did not pass all test cases.'}`);
+        showToast('success', `🎉 Challenge Solved! +${data.earnedPoints} Points`, 5000);
+      } else if (data.status === 'wrong_answer') {
+        showToast('warning', `⚠️ Wrong Answer - Score: ${data.score}%`, 4000);
+      } else if (data.status === 'runtime_error') {
+        showToast('error', '❌ Compilation or Runtime Error', 4000);
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to submit solution.');
+    } catch (err) {
+      setResults({ status: 'error', message: 'Network error.' });
+      showToast('error', '❌ Network error. Please try again.', 4000);
     } finally {
-      setSubmitting(false);
+      setIsExecuting(false);
     }
   };
 
-  if (!isLoaded || loading) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-green-400 animate-pulse text-xl">Loading challenge...</div>
-      </div>
-    );
-  }
+  if (!isLoaded || loading) return <div className="min-h-screen bg-black flex items-center justify-center text-green-400 animate-pulse">Loading IDE...</div>;
+  if (!isSignedIn || !challenge) return <div className="min-h-screen bg-black flex items-center justify-center text-white">Sign in required</div>;
 
-  if (error && !challenge) {
-    return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white p-8 text-center">
-        <div className="text-6xl mb-4">⚠️</div>
-        <h1 className="text-2xl font-bold mb-2 text-red-400">Error Loading Challenge</h1>
-        <p className="text-gray-400 mb-6 max-w-md">{error}</p>
-        <Link href="/challenges" className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold transition">
-          ← Back to Challenges
-        </Link>
-      </div>
-    );
-  }
+  // 🎯 Map database languages to Monaco Editor language identifiers
+  const getMonacoLanguage = (lang: string) => {
+    switch (lang) {
+      case 'C++': return 'cpp';
+      case 'Python': return 'python';
+      case 'JavaScript': return 'javascript';
+      case 'Java': return 'java';
+      default: return 'cpp';
+    }
+  };
 
   return (
-    <main className="min-h-screen bg-black text-white p-4 sm:p-6 lg:p-8">
-      <div className="container mx-auto max-w-5xl">
-        {/* Header */}
-        <div className="mb-6">
-          <Link href="/challenges" className="text-green-400 hover:text-green-300 text-sm mb-4 inline-block">
-            ← Back to Challenges
-          </Link>
-          <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-3xl sm:text-4xl font-bold">{challenge.title}</h1>
-            <span className={`px-3 py-1 rounded-full text-xs font-bold border ${
-              challenge.difficulty === 'easy' ? 'bg-green-600/20 text-green-400 border-green-500/30' :
-              challenge.difficulty === 'medium' ? 'bg-yellow-600/20 text-yellow-400 border-yellow-500/30' :
-              'bg-red-600/20 text-red-400 border-red-500/30'
-            }`}>
-              {challenge.difficulty}
-            </span>
+    <main className="h-screen bg-black text-white flex flex-col">
+      {/* Header */}
+      <header className="bg-gray-900 border-b border-gray-800 px-6 py-3 flex justify-between items-center flex-shrink-0">
+        <div className="flex items-center gap-4">
+          <Link href="/challenges" className="text-gray-400 hover:text-white">←</Link>
+          <h1 className="font-bold text-lg">{challenge.title}</h1>
+          <span className={`text-xs px-2 py-0.5 rounded border ${
+            challenge.difficulty === 'easy' ? 'border-green-500 text-green-400' : 
+            challenge.difficulty === 'medium' ? 'border-yellow-500 text-yellow-400' : 'border-red-500 text-red-400'
+          }`}>
+            {challenge.difficulty.toUpperCase()}
+          </span>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={() => handleExecute('run')} disabled={isExecuting} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm font-bold transition">
+            {isExecuting ? '⏳ Running...' : '▶ Run Code'}
+          </button>
+          <button onClick={() => handleExecute('submit')} disabled={isExecuting} className="px-6 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-bold transition shadow-lg shadow-green-600/20">
+            {isExecuting ? '⏳ Grading...' : '✓ Submit Solution'}
+          </button>
+        </div>
+      </header>
+
+      {/* Split View */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left: Problem */}
+        <div className="w-1/2 border-r border-gray-800 overflow-y-auto p-8 bg-gray-950">
+          <h2 className="text-xl font-bold mb-4 text-gray-200">Description</h2>
+          <p className="text-gray-400 leading-relaxed whitespace-pre-wrap">{challenge.description}</p>
+          
+          <h3 className="text-lg font-bold mt-8 mb-3 text-gray-200">Sample Test Cases</h3>
+          <div className="space-y-3">
+            {(challenge.public_test_cases || []).map((tc: any, i: number) => (
+              <div key={i} className="bg-gray-900 p-3 rounded-lg border border-gray-800 font-mono text-xs">
+                <div><span className="text-gray-500">Input:</span> <span className="text-green-400">{tc.input}</span></div>
+                <div><span className="text-gray-500">Expected:</span> <span className="text-blue-400">{tc.expected_output}</span></div>
+              </div>
+            ))}
           </div>
-          <p className="text-gray-400">{challenge.category}</p>
         </div>
 
-        {/* Success/Error Messages */}
-        {success && (
-          <div className="mb-6 p-4 bg-green-600/20 border border-green-500/30 rounded-lg text-green-400 font-bold">
-            {success}
-          </div>
-        )}
-        {error && challenge && (
-          <div className="mb-6 p-4 bg-red-600/20 border border-red-500/30 rounded-lg text-red-400">
-            {error}
-          </div>
-        )}
-
-        {/* Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Problem Description */}
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-            <h2 className="text-xl font-bold mb-4">Problem Description</h2>
-            <div className="prose prose-invert max-w-none text-gray-300 whitespace-pre-wrap">
-              {challenge.prompt || challenge.description || 'No description available.'}
+        {/* Right: Editor & Console */}
+        <div className="w-1/2 flex flex-col bg-[#1e1e1e]"> 
+          {/* 🎯 REAL CODE EDITOR (Monaco) */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="bg-gray-900 px-4 py-2 border-b border-gray-800 flex justify-between items-center">
+              <span className="text-xs text-gray-400 font-mono uppercase">{challenge.language}</span>
+              <button onClick={() => setCode(challenge.starter_code || '')} className="text-xs text-gray-500 hover:text-white transition">Reset Code</button>
             </div>
             
-            {challenge.expected_output && (
-              <div className="mt-6 p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg">
-                <h3 className="text-blue-400 font-bold mb-2">Expected Output</h3>
-                <pre className="text-gray-300 text-sm font-mono whitespace-pre-wrap">{challenge.expected_output}</pre>
-              </div>
-            )}
-            
-            {challenge.hints && (
-              <div className="mt-6 p-4 bg-yellow-900/20 border border-yellow-500/30 rounded-lg">
-                <h3 className="text-yellow-400 font-bold mb-2">💡 Hints</h3>
-                <p className="text-gray-300 text-sm whitespace-pre-wrap">{challenge.hints}</p>
-              </div>
-            )}
+            <div className="flex-1 w-full">
+              <Editor
+                height="100%"
+                language={getMonacoLanguage(challenge.language)}
+                theme="vs-dark"
+                value={code}
+                onChange={(value) => setCode(value || '')}
+                options={{
+                  minimap: { enabled: false },
+                  fontSize: 14,
+                  lineNumbers: 'on',
+                  scrollBeyondLastLine: false,
+                  automaticLayout: true,
+                  padding: { top: 16, bottom: 16 },
+                  fontFamily: "'Fira Code', 'Courier New', monospace"
+                }}
+              />
+            </div>
           </div>
 
-          {/* Code Editor */}
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold">Code Editor</h2>
-              <span className="text-xs text-gray-500">{challenge.language || 'JavaScript'}</span>
-            </div>
-
-            {/* 🎯 PROPER MONACO EDITOR COMPONENT */}
-            <Editor
-              height="400px"
-              defaultLanguage={
-                challenge.language?.toLowerCase().includes('python') ? 'python' :
-                challenge.language?.toLowerCase().includes('c++') ? 'cpp' :
-                challenge.language?.toLowerCase().includes('java') ? 'java' :
-                'javascript'
-              }
-              theme="vs-dark"
-              value={code}
-              onChange={(value) => setCode(value || '')}
-              options={{
-                fontSize: 14,
-                minimap: { enabled: true },
-                scrollBeyondLastLine: false,
-                automaticLayout: true,
-                tabSize: 2,
-                wordWrap: 'on',
-                formatOnPaste: true,
-                formatOnType: true,
-              }}
-            />
+          {/* 🎯 Collapsible Console */}
+          <div className={`bg-black border-t border-gray-800 transition-all duration-300 flex flex-col ${isConsoleOpen ? 'h-64' : 'h-10'}`}>
+            <button 
+              onClick={() => setIsConsoleOpen(!isConsoleOpen)}
+              className="w-full px-4 py-2 flex justify-between items-center text-xs font-bold text-gray-400 hover:bg-gray-900 transition flex-shrink-0"
+            >
+              <span className="flex items-center gap-2">
+                <span>💻 CONSOLE & RESULTS</span>
+                {results?.status === 'accepted' && <span className="text-green-400">✓ Accepted</span>}
+                {results?.status === 'wrong_answer' && <span className="text-orange-400">✗ Failed</span>}
+              </span>
+              <span>{isConsoleOpen ? '▼' : '▲'}</span>
+            </button>
             
-            {/* Output Console - VS Code Terminal Style */}
-            {output && (
-              <div className="mt-4 bg-[#1e1e1e] border border-gray-700 rounded-lg overflow-hidden">
-                <div className="bg-[#2d2d2d] px-4 py-2 flex items-center gap-2 border-b border-gray-700">
-                  <div className="flex gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-red-500" />
-                    <div className="w-3 h-3 rounded-full bg-yellow-500" />
-                    <div className="w-3 h-3 rounded-full bg-green-500" />
+            {isConsoleOpen && results && (
+              <div className="p-4 overflow-y-auto flex-1 font-mono text-xs">
+                {results.status === 'running' && <p className="text-yellow-400 animate-pulse">{results.message}</p>}
+                
+                {results.status === 'runtime_error' && (
+                  <div className="text-red-400 whitespace-pre-wrap">
+                    <p className="font-bold mb-2">❌ Compilation / Runtime Error:</p>
+                    <pre className="bg-red-900/20 p-3 rounded border border-red-900/50 overflow-x-auto">{results.errorMessage}</pre>
                   </div>
-                  <span className="text-xs text-gray-400 ml-2 font-mono">Terminal — Output</span>
-                </div>
-                <pre className="p-4 text-sm text-green-400 font-mono whitespace-pre-wrap max-h-60 overflow-y-auto">
-                  {output}
-                </pre>
-              </div>
-            )}
-
-            <div className="mt-4 flex gap-3">
-              <button 
-                onClick={handleRunCode}
-                disabled={running}
-                className="flex-1 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 text-white rounded-lg font-bold transition flex items-center justify-center gap-2"
-              >
-                {running ? (
-                  <>
-                    <span className="animate-spin">⚙️</span>
-                    Running...
-                  </>
-                ) : (
-                  '▶️ Run Code'
                 )}
-              </button>
-              <button 
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="flex-1 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 text-white rounded-lg font-bold transition flex items-center justify-center gap-2"
-              >
-                {submitting ? (
-                  <>
-                    <span className="animate-spin">⚙️</span>
-                    Submitting...
-                  </>
-                ) : (
-                  '🚀 Submit'
-                )}
-              </button>
-            </div>
 
-            {userSubmission && (
-              <div className={`mt-4 p-3 rounded-lg text-sm font-bold ${
-                userSubmission.status === 'accepted' ? 'bg-green-600/20 text-green-400' : 'bg-red-600/20 text-red-400'
-              }`}>
-                Previous Status: {userSubmission.status.toUpperCase()}
+                {results.status === 'accepted' && (
+                  <div className="text-green-400">
+                    <p className="text-lg font-bold mb-2">🎉 Accepted! +{results.earnedPoints} Points</p>
+                    <p>Score: {results.score}%</p>
+                    {results.hiddenTotal > 0 && <p className="mt-1 text-green-300">Passed {results.hiddenPassed}/{results.hiddenTotal} Hidden Test Cases.</p>}
+                  </div>
+                )}
+
+                {results.status === 'wrong_answer' && (
+                  <div className="text-orange-400">
+                    <p className="font-bold mb-2">⚠️ Wrong Answer (Score: {results.score}%)</p>
+                    {results.hiddenTotal > 0 && <p className="mb-3 text-orange-300">Passed {results.hiddenPassed}/{results.hiddenTotal} Hidden Test Cases.</p>}
+                    
+                    <div className="space-y-2 mt-4">
+                      <p className="text-gray-400 font-bold uppercase text-[10px] tracking-wider">Public Test Results:</p>
+                      {results.publicResults?.map((r: any, i: number) => (
+                        <div key={i} className={`p-3 rounded border ${r.passed ? 'border-green-800 bg-green-900/10' : 'border-red-800 bg-red-900/10'}`}>
+                          <p className="font-bold mb-1">Case {i + 1}: {r.passed ? '✅ Passed' : '❌ Failed'}</p>
+                          {!r.passed && (
+                            <div className="mt-2 text-[11px] space-y-1">
+                              <p>Input: <span className="text-yellow-400">{r.input}</span></p>
+                              <p>Expected: <span className="text-blue-400 whitespace-pre-wrap">{r.expected}</span></p>
+                              <p>Actual: <span className="text-red-400 whitespace-pre-wrap">{r.actual}</span></p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

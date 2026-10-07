@@ -11,6 +11,24 @@ const config: Config = {
   ],
   theme: {
     extend: {
+        theme: {
+    extend: {
+      // ... your existing colors, fonts, etc.
+      keyframes: {
+        wiggle: {
+          '0%, 100%': { transform: 'rotate(-10deg)' },
+          '50%': { transform: 'rotate(10deg)' },
+        },
+        'ping-slow': {
+          '75%, 100%': { transform: 'scale(1.5)', opacity: '0' },
+        }
+      },
+      animation: {
+        wiggle: 'wiggle 0.5s ease-in-out',
+        'ping-slow': 'ping-slow 1.5s cubic-bezier(0, 0, 0.2, 1) infinite',
+      }
+    },
+  },
       colors: {
         background: 'var(--background)',
         foreground: 'var(--foreground)',
@@ -21,3 +39,4 @@ const config: Config = {
 };
 
 export default config;
+

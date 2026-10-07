@@ -4,181 +4,181 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useUser } from '@clerk/nextjs';
 
+type Difficulty = 'easy' | 'medium' | 'hard';
+type Status = 'not_started' | 'in_progress' | 'solved';
+
+interface Challenge {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  difficulty: Difficulty;
+  points: number;
+  language: string;
+  user_status: Status;
+  solved_at: string | null;
+}
+
 export default function ChallengesPage() {
-  const { user, isLoaded } = useUser();
-  const [challenges, setChallenges] = useState<any[]>([]);
-  const [filter, setFilter] = useState('all');
+  const { isLoaded, isSignedIn, user } = useUser();
+  const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [stats, setStats] = useState({ totalChallenges: 0, solved: 0, inProgress: 0, totalPoints: 0 });
   const [loading, setLoading] = useState(true);
-useEffect(() => {
-  fetchChallenges();
-}, []);
+  const [filter, setFilter] = useState<'all' | Difficulty>('all');
 
-const fetchChallenges = async () => {
-  try {
-    const res = await fetch('/api/challenges');
-    if (res.ok) {
-      const data = await res.json();
-      setChallenges(data.challenges || []);
-    } else {
-      console.error('Failed to fetch challenges');
-      setChallenges([]);
+  useEffect(() => {
+    if (isSignedIn) {
+      fetch('/api/challenges')
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            setChallenges(data.challenges);
+            setStats(data.stats);
+          }
+          setLoading(false);
+        })
+        .catch(err => {
+          console.error('Failed to fetch challenges:', err);
+          setLoading(false);
+        });
     }
-  } catch (error) {
-    console.error('Failed to fetch challenges:', error);
-    setChallenges([]);
-  } finally {
-    setLoading(false);
+  }, [isSignedIn]);
+
+  if (!isLoaded || loading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-green-400 animate-pulse text-xl font-bold">Loading challenges...</div>
+      </div>
+    );
   }
-};
 
-  const getDifficultyColor = (diff: string) => {
-    switch (diff.toLowerCase()) {
-      case 'easy': return 'bg-green-600/20 text-green-400 border-green-500/30';
-      case 'medium': return 'bg-yellow-600/20 text-yellow-400 border-yellow-500/30';
-      case 'hard': return 'bg-red-600/20 text-red-400 border-red-500/30';
-      default: return 'bg-gray-600/20 text-gray-400 border-gray-500/30';
-    }
-  };
+  if (!isSignedIn) {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center text-center px-4">
+        <h2 className="text-3xl font-bold text-white mb-4">Sign in to tackle challenges</h2>
+        <Link href="/sign-in" className="px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold transition">
+          Sign In
+        </Link>
+      </div>
+    );
+  }
 
   const filteredChallenges = filter === 'all' 
     ? challenges 
-    : challenges.filter(c => c.difficulty.toLowerCase() === filter);
-   if (loading) {
-  return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <div className="text-green-400 animate-pulse text-xl">Loading challenges...</div>
-    </div>
-  );
-}
+    : challenges.filter(c => c.difficulty === filter);
+
+  const getDifficultyColor = (diff: Difficulty) => {
+    switch (diff) {
+      case 'easy': return 'bg-green-500/20 text-green-400 border-green-500/30';
+      case 'medium': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+      case 'hard': return 'bg-red-500/20 text-red-400 border-red-500/30';
+    }
+  };
+
+  const getStatusIcon = (status: Status) => {
+    switch (status) {
+      case 'solved': return '🟢';
+      case 'in_progress': return '🟡';
+      default: return '⚪';
+    }
+  };
 
   return (
-    <main className="min-h-screen bg-black text-white p-4 sm:p-6 lg:p-8">
-      <div className="container mx-auto max-w-6xl">
-        
-        {/* Header & Stats */}
-        <div className="mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold mb-2 flex items-center gap-3">
-            💻 Coding Challenges
+    <main className="min-h-screen bg-black text-white pb-20">
+      {/* 🎯 1. HERO & STATS */}
+      <div className="relative overflow-hidden border-b border-gray-800 bg-gradient-to-b from-gray-900/50 to-black">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 py-12 sm:py-16">
+          <h1 className="text-4xl sm:text-5xl font-extrabold mb-4 bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent">
+            Coding Challenges
           </h1>
-          <p className="text-gray-400 mb-6">
-            Sharpen your problem-solving skills and climb the global leaderboard.
+          <p className="text-gray-400 text-lg max-w-2xl mb-8">
+            Sharpen your skills, earn points, and climb the squad leaderboard.
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 flex items-center gap-4">
-              <div className="w-12 h-12 bg-green-600/20 rounded-xl flex items-center justify-center text-2xl">✅</div>
-              <div>
-                <p className="text-gray-400 text-sm">Total Solved</p>
-                <p className="text-2xl font-bold text-white">24</p>
-              </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-4">
+              <p className="text-gray-400 text-xs uppercase tracking-wider">Total Points</p>
+              <p className="text-3xl font-bold text-purple-400 mt-1">{stats.totalPoints}</p>
             </div>
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 flex items-center gap-4">
-              <div className="w-12 h-12 bg-purple-600/20 rounded-xl flex items-center justify-center text-2xl">🔥</div>
-              <div>
-                <p className="text-gray-400 text-sm">Current Streak</p>
-                <p className="text-2xl font-bold text-white">5 Days</p>
-              </div>
+            <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-4">
+              <p className="text-gray-400 text-xs uppercase tracking-wider">Solved</p>
+              <p className="text-3xl font-bold text-green-400 mt-1">{stats.solved}</p>
             </div>
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 flex items-center gap-4">
-              <div className="w-12 h-12 bg-yellow-600/20 rounded-xl flex items-center justify-center text-2xl">🏆</div>
-              <div>
-                <p className="text-gray-400 text-sm">Global Rank</p>
-                <p className="text-2xl font-bold text-white">#142</p>
-              </div>
+            <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-4">
+              <p className="text-gray-400 text-xs uppercase tracking-wider">In Progress</p>
+              <p className="text-3xl font-bold text-yellow-400 mt-1">{stats.inProgress}</p>
+            </div>
+            <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-4">
+              <p className="text-gray-400 text-xs uppercase tracking-wider">Available</p>
+              <p className="text-3xl font-bold text-gray-300 mt-1">{stats.totalChallenges}</p>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          {['all', 'easy', 'medium', 'hard'].map((f) => (
+      <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8">
+        {/* 🎯 2. FILTERS */}
+        <div className="flex flex-wrap gap-3 mb-8">
+          {(['all', 'easy', 'medium', 'hard'] as const).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-5 py-2 rounded-lg font-bold text-sm capitalize transition ${
-                filter === f
-                  ? 'bg-green-600 text-white shadow-lg shadow-green-900/30'
-                  : 'bg-gray-900 text-gray-400 border border-gray-800 hover:bg-gray-800 hover:text-white'
+              className={`px-4 py-2 rounded-full text-sm font-bold capitalize transition-all ${
+                filter === f 
+                  ? 'bg-white text-black shadow-lg shadow-white/10' 
+                  : 'bg-gray-900 text-gray-400 border border-gray-800 hover:border-gray-600'
               }`}
             >
-              {f}
+              {f === 'all' ? 'All Challenges' : f}
             </button>
           ))}
         </div>
 
-        {/* Challenges List */}
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-          
-          {/* Table Header (Desktop) */}
-          <div className="hidden sm:grid grid-cols-12 gap-4 p-4 border-b border-gray-800 text-xs font-bold text-gray-400 uppercase tracking-wider">
-            <div className="col-span-1 text-center">Status</div>
-            <div className="col-span-5">Title</div>
-            <div className="col-span-2 text-center">Difficulty</div>
-            <div className="col-span-2 text-center">Category</div>
-            <div className="col-span-2 text-center">Success Rate</div>
+        {/* 🎯 3. CHALLENGES GRID */}
+        {filteredChallenges.length === 0 ? (
+          <div className="text-center py-20 bg-gray-900/30 rounded-3xl border border-gray-800 border-dashed">
+            <p className="text-gray-400 text-lg">No challenges found for this filter.</p>
           </div>
-
-          {/* Rows */}
-                {/* Rows */}
-          <div className="divide-y divide-gray-800">
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredChallenges.map((challenge) => (
               <Link
                 key={challenge.id}
                 href={`/challenges/${challenge.id}`}
-                className="grid grid-cols-1 sm:grid-cols-12 gap-4 p-4 sm:p-5 hover:bg-gray-800/50 transition group items-center"
+                className="group relative bg-gray-900/50 border border-gray-800 rounded-2xl p-6 hover:border-purple-500/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-purple-500/10 flex flex-col"
               >
-                {/* Status */}
-                <div className="col-span-1 flex sm:justify-center">
-                  {challenge.completed ? (
-                    <span className="text-green-400 text-xl" title="Completed">✅</span>
-                  ) : (
-                    <span className="text-gray-600 text-xl" title="Not Started">⬜</span>
-                  )}
+                <div className="flex justify-between items-start mb-4">
+                  <div className={`px-2 py-1 rounded-md text-xs font-bold border ${getDifficultyColor(challenge.difficulty)}`}>
+                    {challenge.difficulty.toUpperCase()}
+                  </div>
+                  <div className="text-2xl" title={challenge.user_status}>
+                    {getStatusIcon(challenge.user_status)}
+                  </div>
                 </div>
 
-                {/* Title */}
-                <div className="col-span-5">
-                  <h3 className="text-base sm:text-lg font-bold text-white group-hover:text-green-400 transition mb-1 sm:mb-0">
-                    {challenge.title}
-                  </h3>
-                  <span className="sm:hidden text-xs text-gray-500">
-                    {challenge.category} • {challenge.solves?.toLocaleString() || 0} solves
-                  </span>
-                </div>
+                <h3 className="text-xl font-bold text-white mb-2 group-hover:text-purple-400 transition-colors">
+                  {challenge.title}
+                </h3>
+                <p className="text-gray-400 text-sm mb-4 flex-1 line-clamp-3">
+                  {challenge.description}
+                </p>
 
-                {/* Difficulty */}
-                <div className="col-span-2 flex sm:justify-center">
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getDifficultyColor(challenge.difficulty)}`}>
-                    {challenge.difficulty}
-                  </span>
-                </div>
-
-                {/* Category */}
-                <div className="col-span-2 hidden sm:flex justify-center">
-                  <span className="px-3 py-1 bg-black text-gray-300 rounded-full text-xs font-medium border border-gray-700">
-                    {challenge.category || 'General'}
-                  </span>
-                </div>
-
-                {/* Success Rate / Action */}
-                <div className="col-span-2 flex sm:justify-center items-center gap-3">
-                  <span className="hidden sm:block text-sm text-gray-400 font-medium">
-                    {challenge.successRate || '—'}
-                  </span>
-                  <span className="sm:hidden text-green-400 font-bold text-sm">Start →</span>
+                <div className="flex items-center justify-between pt-4 border-t border-gray-800 mt-auto">
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <span className="px-2 py-1 bg-gray-800 rounded">{challenge.language}</span>
+                    <span className="px-2 py-1 bg-gray-800 rounded">{challenge.category}</span>
+                  </div>
+                  <div className="text-purple-400 font-bold text-sm flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                    {challenge.points} pts
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
                 </div>
               </Link>
             ))}
           </div>
-
-          {filteredChallenges.length === 0 && (
-            <div className="p-12 text-center text-gray-400">
-              <div className="text-4xl mb-3">🔍</div>
-              <p>No challenges found for this difficulty.</p>
-            </div>
-          )}
-        </div>
-
+        )}
       </div>
     </main>
   );

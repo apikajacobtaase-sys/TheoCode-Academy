@@ -9,13 +9,22 @@ import MessageBubble from '@/components/chat/MessageBubble';
 import ImagePreview from '@/components/chat/ImagePreview';
 import EmojiPicker from '@/components/chat/EmojiPicker';
 import AttachmentMenu from '@/components/chat/AttachmentMenu';
+import EditSquadDrawer from '@/components/EditSquadDrawer';
 import { compressImage, fileToBase64, needsDateSeparator, formatDateSeparator } from '@/lib/chatUtils';
-
+import { useTypingIndicator } from '@/lib/useTypingIndicator';
 export default function SquadChatPage() {
   const { id: squadId } = useParams();
   const { user, isLoaded } = useUser();
-  const { messages, loading, error, refetch } = useSquadChat(squadId as string);
   
+   const { messages, initialLoading, error, sendMessage, refetch } = useSquadChat(
+     squadId as string, 
+     user?.id || null // 🎯 Pass user ID for optimistic UI
+   );
+    // 🎯 Typing indicator
+  const { typingMessage, markTyping, clearTyping } = useTypingIndicator(
+    squadId as string, 
+    user?.id || null
+  );
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [squad, setSquad] = useState<any>(null);
@@ -24,55 +33,67 @@ export default function SquadChatPage() {
   const [showEmoji, setShowEmoji] = useState(false);
   const [showAttach, setShowAttach] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
+  const [showEditDrawer, setShowEditDrawer] = useState(false); // 🎯 Added for drawer
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const [pendingMedia, setPendingMedia] = useState<any>(null); // 🎯 Holds the image/video before sending
+     // 🎯 Initialize UploadThing for chat media
+  // Auto-scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // 🎯 CONSOLIDATED: Fetch squad details once
   useEffect(() => {
     if (squadId) {
       fetch(`/api/squads/${squadId}`)
         .then(res => res.json())
-        .then(data => setSquad(data.squad))
+        .then(data => {
+          setSquad(data.squad);
+          console.log('🔍 DEBUG SQUAD:', { 
+            dbCreatorId: data.squad?.creator_id, 
+            currentUserId: user?.id,
+            userRole: data.squad?.role
+          });
+        })
         .catch(err => console.error('Failed to fetch squad:', err));
     }
-  }, [squadId]);
+  }, [squadId, user?.id]);
 
-  useEffect(() => {
-    if (squadId && messages.length > 0) {
-      fetch(`/api/squads/${squadId}/messages`, { method: 'PUT' }).catch(() => {});
-    }
-  }, [squadId, messages.length]);
+   // Mark messages as read
+   useEffect(() => {
+   if (squadId && messages.length > 0) {
+       fetch(`/api/squads/${squadId}/messages`, { method: 'PUT' }).catch(() => {});
+     }
+   }, [squadId, messages.length]);
 
-  // 🎯 Listen for auto-refresh events
+  // Listen for auto-refresh events
   useEffect(() => {
     const handleRefresh = () => refetch();
     window.addEventListener('refresh-squad-chat', handleRefresh);
     return () => window.removeEventListener('refresh-squad-chat', handleRefresh);
   }, [refetch]);
 
-  const handleSendText = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if ((!newMessage.trim() && !replyTo) || sending) return;
+  const handleSend = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    
+    const textContent = newMessage.trim();
+    if ((!textContent && !replyTo && !pendingMedia) || sending) return;
 
     setSending(true);
+    clearTyping(); // 🎯 Clear typing indicator immediately
+
     try {
-      await fetch(`/api/squads/${squadId}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: newMessage,
-          message_type: 'text',
-          reply_to_id: replyTo?.id || null
-        })
-      });
+      // 🎯 Call the hook's optimized, optimistic sendMessage
+      await sendMessage(textContent, pendingMedia || undefined, replyTo?.id);
+      
+      // Clear UI state after successful send
       setNewMessage('');
       setReplyTo(null);
-      refetch();
+      setPendingMedia(null);
     } catch (error) {
       console.error('Failed to send:', error);
     } finally {
@@ -80,91 +101,43 @@ export default function SquadChatPage() {
     }
   };
 
-  const handleImageUpload = async (file: File) => {
-    try {
-      setUploadProgress('Compressing image...');
-      const compressed = await compressImage(file);
-      setUploadProgress('Sending...');
-      await fetch(`/api/squads/${squadId}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message_type: 'image',
-          file_data: compressed,
-          file_name: file.name,
-          file_size: file.size,
-          file_mime: file.type,
-          reply_to_id: replyTo?.id || null
-        })
-      });
-      setReplyTo(null);
-      refetch();
-    } catch (error) {
-      console.error('Image upload failed:', error);
-    } finally {
-      setUploadProgress(null);
-    }
-  };
-
-  const handleVideoUpload = async (file: File) => {
-    if (file.size > 20 * 1024 * 1024) {
-      alert('Video must be smaller than 20MB');
+    const handleMediaUpload = async (file: File, type: 'image' | 'video' | 'file') => {
+    if (file.size > 8 * 1024 * 1024) {
+      alert('File must be smaller than 8MB');
       return;
     }
+
+    setUploadProgress(`Processing ${type}...`);
+
     try {
-      setUploadProgress('Uploading video...');
-      const base64 = await fileToBase64(file);
-      await fetch(`/api/squads/${squadId}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message_type: 'video',
-          file_data: base64,
-          file_name: file.name,
-          file_size: file.size,
-          file_mime: file.type,
-          reply_to_id: replyTo?.id || null
-        })
+      let mediaSource = '';
+
+      if (type === 'image') {
+        mediaSource = await compressImage(file);
+      } else {
+        mediaSource = await fileToBase64(file);
+      }
+
+      // 🎯 MAGIC FIX: Save to state instead of sending immediately!
+      setPendingMedia({
+        url: mediaSource,
+        type: file.type,
+        name: file.name,
+        messageType: type
       });
-      setReplyTo(null);
-      refetch();
+      
+      // Focus the input so the user can type a caption
+      const input = document.getElementById('chat-input');
+      if (input) input.focus();
+
     } catch (error) {
-      console.error('Video upload failed:', error);
+      console.error(`${type} processing failed:`, error);
+      alert(`Failed to process ${type}.`);
     } finally {
       setUploadProgress(null);
     }
   };
-
-  const handleFileUpload = async (file: File) => {
-    if (file.size > 10 * 1024 * 1024) {
-      alert('File must be smaller than 10MB');
-      return;
-    }
-    try {
-      setUploadProgress('Uploading file...');
-      const base64 = await fileToBase64(file);
-      await fetch(`/api/squads/${squadId}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message_type: 'file',
-          file_data: base64,
-          file_name: file.name,
-          file_size: file.size,
-          file_mime: file.type,
-          reply_to_id: replyTo?.id || null
-        })
-      });
-      setReplyTo(null);
-      refetch();
-    } catch (error) {
-      console.error('File upload failed:', error);
-    } finally {
-      setUploadProgress(null);
-    }
-  };
-
-  if (!isLoaded || loading) {
+  if (!isLoaded || initialLoading) {
     return <div className="min-h-screen bg-black flex items-center justify-center text-green-400 animate-pulse">Loading chat...</div>;
   }
 
@@ -187,7 +160,6 @@ export default function SquadChatPage() {
 
   return (
     <main className="h-[100dvh] bg-black text-white flex flex-col overflow-hidden">
-      
       {/* WhatsApp-style header */}
       <div className="bg-gray-900 border-b border-gray-800 px-4 py-2 flex items-center gap-3 flex-shrink-0">
         <Link href="/squad" className="text-green-400 hover:text-green-300 transition p-2">
@@ -200,10 +172,24 @@ export default function SquadChatPage() {
         
         <div className="flex-1 min-w-0">
           <h1 className="text-base font-semibold text-white truncate">{squad?.name || 'Squad Chat'}</h1>
+          {/* 🎯 FIXED: Using members.length instead of member_count */}
           <p className="text-xs text-green-400 truncate">
-            {squad?.member_count || 0} members • {squad?.description || 'Team collaboration'}
+            {squad?.members?.length || 0} members • {squad?.description || 'Team collaboration'}
           </p>
         </div>
+
+        {/* 🎯 WHATSAPP-STYLE EDIT BUTTON: Opens drawer, allows owner OR leader */}
+        {(squad?.role === 'owner' || squad?.role === 'leader') && (
+          <button
+            onClick={() => setShowEditDrawer(true)}
+            className="p-2 text-gray-400 hover:text-green-400 transition"
+            title="Edit Squad"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </button>
+        )}
 
         <button className="p-2 text-gray-400 hover:text-green-400 transition">🔍</button>
         <button className="p-2 text-gray-400 hover:text-green-400 transition">⋮</button>
@@ -287,6 +273,44 @@ export default function SquadChatPage() {
           <button onClick={() => setReplyTo(null)} className="text-gray-400 hover:text-white text-xl">✕</button>
         </div>
       )}
+                {/* 🎯 Pending Media Preview */}
+      {pendingMedia && (
+        <div className="bg-gray-900 border-t border-gray-800 px-4 py-2 flex items-center gap-3">
+          <div className="relative flex-shrink-0">
+            {pendingMedia.messageType === 'image' ? (
+              <img src={pendingMedia.url} alt="Preview" className="h-16 w-16 rounded-lg object-cover border border-gray-700" />
+            ) : pendingMedia.messageType === 'video' ? (
+              <video src={pendingMedia.url} className="h-16 w-16 rounded-lg object-cover border border-gray-700" />
+            ) : (
+              <div className="h-16 w-16 rounded-lg bg-gray-800 border border-gray-700 flex items-center justify-center text-2xl">
+                📄
+              </div>
+            )}
+            <button
+              onClick={() => setPendingMedia(null)}
+              className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-xs shadow-md"
+              title="Remove media"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-bold text-green-400">Ready to send</p>
+            <p className="text-xs text-gray-400 truncate">{pendingMedia.name}</p>
+          </div>
+        </div>
+      )}
+             {/* 🎯 Typing Indicator */}
+      {typingMessage && (
+        <div className="bg-gray-900 border-t border-gray-800 px-4 py-1.5 flex items-center gap-2">
+          <div className="flex gap-1">
+            <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+            <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+            <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
+          <span className="text-xs text-gray-400 italic">{typingMessage}</span>
+        </div>
+      )}
 
       {/* Input area */}
       <div className="bg-gray-900 px-3 py-2 flex items-end gap-2 flex-shrink-0 relative border-t border-gray-800">
@@ -297,27 +321,47 @@ export default function SquadChatPage() {
 
         <div className="relative">
           <button onClick={() => { setShowAttach(!showAttach); setShowEmoji(false); }} className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-green-400 transition text-xl rotate-45">📎</button>
-          {showAttach && <AttachmentMenu onImageSelect={handleImageUpload} onVideoSelect={handleVideoUpload} onFileSelect={handleFileUpload} onClose={() => setShowAttach(false)} />}
+            {showAttach && (
+     <AttachmentMenu 
+       onImageSelect={(file) => handleMediaUpload(file, 'image')} 
+       onVideoSelect={(file) => handleMediaUpload(file, 'video')} 
+       onFileSelect={(file) => handleMediaUpload(file, 'file')} 
+       onClose={() => setShowAttach(false)} 
+     />
+   )}
         </div>
 
-        <div className="flex-1 bg-black rounded-lg flex items-center border border-gray-800 focus-within:border-green-500 transition">
+                
+<div className="flex-1 bg-black rounded-lg flex items-center border border-gray-800 focus-within:border-green-500 transition">
           <input
+            id="chat-input"
             ref={inputRef}
             type="text"
             value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendText(e as any); } }}
-            placeholder="Type a message"
+            onChange={(e) => {
+              setNewMessage(e.target.value);
+              // 🎯 Trigger typing indicator when user types
+              if (e.target.value.trim() && user) {
+                markTyping(user.firstName || user.fullName || 'User');
+              }
+            }}
+              onKeyDown={(e) => {
+     if (e.key === 'Enter' && !e.shiftKey) {
+       e.preventDefault();
+       clearTyping(); 
+       handleSend(e as any); // 🎯 CHANGED HERE
+     }
+   }}
+            placeholder={pendingMedia ? "Add a caption..." : "Type a message"}
             className="flex-1 bg-transparent px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none text-sm"
             disabled={sending}
           />
         </div>
-
-        <button
-          onClick={handleSendText}
-          disabled={sending || (!newMessage.trim() && !replyTo)}
-          className="w-10 h-10 bg-green-600 hover:bg-green-700 disabled:bg-gray-800 disabled:cursor-not-allowed rounded-full flex items-center justify-center transition flex-shrink-0"
-        >
+               <button
+     onClick={handleSend} // 🎯 CHANGED HERE
+     disabled={sending || (!newMessage.trim() && !replyTo && !pendingMedia)}
+     className="w-10 h-10 bg-green-600 hover:bg-green-700 disabled:bg-gray-800 disabled:cursor-not-allowed rounded-full flex items-center justify-center transition flex-shrink-0"
+   >
           {sending ? (
             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
           ) : (
@@ -327,6 +371,22 @@ export default function SquadChatPage() {
       </div>
 
       {previewImage && <ImagePreview src={previewImage} onClose={() => setPreviewImage(null)} />}
+
+      {/* 🎯 WHATSAPP-STYLE EDIT DRAWER */}
+      {squad && (
+        <EditSquadDrawer
+          squadId={squadId as string}
+          isOpen={showEditDrawer}
+          onClose={() => setShowEditDrawer(false)}
+          onSaved={(updatedSquad) => {
+            // Silently update the header state without refreshing the page!
+            setSquad((prev: any) => ({ ...prev, ...updatedSquad }));
+          }}
+          currentName={squad.name || ''}
+          currentDescription={squad.description || ''}
+          currentImageUrl={squad.image_url || ''}
+        />
+      )}
     </main>
   );
 }

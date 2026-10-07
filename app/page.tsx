@@ -1,218 +1,132 @@
+'use client';
+
 import Link from 'next/link';
+import Image from 'next/image';
+import { useAuth } from '@clerk/nextjs';
 
-// 🎯 Fetch top courses directly on the server for fast loading
-async function getFeaturedCourses() {
-  try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/courses?sort=popular`, {
-      cache: 'no-store', // Always get fresh data
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data.courses?.slice(0, 3) || []; // Get top 3
-  } catch (error) {
-    console.error('Failed to fetch featured courses:', error);
-    return [];
-  }
-}
-
-export default async function HomePage() {
-  const featuredCourses = await getFeaturedCourses();
+export default function HomePage() {
+  const { isSignedIn } = useAuth();
 
   return (
-    <main className="min-h-screen bg-black text-white">
-      
-      {/* ==================== HERO SECTION ==================== */}
-      <section className="relative overflow-hidden pt-20 pb-32 px-4 sm:px-6 lg:px-8">
-        {/* Background Glow Effect */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-green-500/10 rounded-full blur-[120px] pointer-events-none" />
-        <div className="absolute top-20 right-0 w-[400px] h-[400px] bg-purple-500/10 rounded-full blur-[100px] pointer-events-none" />
+    <main className="min-h-screen bg-black text-white overflow-hidden">
+      {/* 🎯 1. HERO SECTION WITH ANIMATED BACKGROUND */}
+      <div className="relative min-h-[90vh] flex items-center justify-center">
+        
+        {/* Background Image with Professional Overlay */}
+        <div className="absolute inset-0 z-0">
+          {/* REPLACE 'hero-coding-bg.jpg' WITH YOUR ACTUAL PEXELS IMAGE NAME */}
+          <Image
+            src="/images/hero-coding-bg.jpg"
+            alt="Students learning to code"
+            fill
+            className="object-cover opacity-40"
+            priority
+          />
+          {/* Gradient Overlay for readability */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-purple-900/30" />
+        </div>
 
-        <div className="relative container mx-auto max-w-5xl text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-900 border border-gray-800 text-sm text-gray-300 mb-8">
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            New C++ 20 Masterclass just dropped!
+        {/* Hero Content */}
+        <div className="relative z-10 max-w-5xl mx-auto px-4 text-center">
+          {/* Animated Badge */}
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 text-sm font-bold mb-6 animate-pulse">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+            </span>
+            Now Enrolling: Full-Stack Development
           </div>
-          
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight mb-6">
-            Master Modern <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600">
-              Software Development
+
+          {/* Main Headline with Gradient Text */}
+          <h1 className="text-5xl sm:text-7xl font-extrabold tracking-tight mb-6">
+            Master Coding with{' '}
+            <span className="bg-gradient-to-r from-green-400 via-emerald-400 to-purple-500 bg-clip-text text-transparent">
+              TheoCode Academy
             </span>
           </h1>
-          
-          <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-            Join thousands of developers leveling up their skills with interactive lessons, 
-            real-world projects, and a supportive community.
+
+          <p className="text-xl sm:text-2xl text-gray-300 mb-10 max-w-3xl mx-auto leading-relaxed">
+            Interactive courses, real-time code execution, and a community of builders. 
+            Start your journey from beginner to pro today.
           </p>
-          
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link 
-              href="/explore" 
-              className="w-full sm:w-auto px-8 py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-lg transition transform hover:scale-105 shadow-lg shadow-green-900/20"
-            >
-              🚀 Explore Courses
-            </Link>
-            <Link 
-              href="/about" 
-              className="w-full sm:w-auto px-8 py-4 bg-gray-900 hover:bg-gray-800 text-white border border-gray-800 rounded-xl font-bold text-lg transition"
-            >
-              Learn More →
-            </Link>
-          </div>
 
-          {/* Stats */}
-          <div className="mt-20 grid grid-cols-2 md:grid-cols-4 gap-8 border-t border-gray-800 pt-10">
-            <div>
-              <div className="text-3xl font-bold text-white">5,000+</div>
-              <div className="text-sm text-gray-500 mt-1">Active Learners</div>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-white">50+</div>
-              <div className="text-sm text-gray-500 mt-1">Expert Courses</div>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-white">100+</div>
-              <div className="text-sm text-gray-500 mt-1">Coding Challenges</div>
-            </div>
-            <div>
-              <div className="text-3xl font-bold text-white">4.9/5</div>
-              <div className="text-sm text-gray-500 mt-1">Average Rating</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ==================== FEATURED COURSES ==================== */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-950/50 border-y border-gray-900">
-        <div className="container mx-auto max-w-6xl">
-          <div className="flex items-center justify-between mb-10">
-            <div>
-              <h2 className="text-3xl font-bold text-white mb-2">🔥 Featured Courses</h2>
-              <p className="text-gray-400">Hand-picked by our instructors to get you started.</p>
-            </div>
-            <Link href="/explore" className="hidden sm:flex items-center gap-2 text-green-400 hover:text-green-300 font-medium transition">
-              View All Courses →
-            </Link>
-          </div>
-
-          {featuredCourses.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {featuredCourses.map((course: any) => (
-                <Link 
-                  key={course.id} 
-                  href={`/courses/${course.id}`}
-                  className="group bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden hover:border-green-500/50 transition-all duration-300 hover:-translate-y-1"
+          {/* 🎯 CALL TO ACTION BUTTONS */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            {isSignedIn ? (
+              <>
+                <Link
+                  href="/explore"
+                  className="group relative px-8 py-4 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold text-lg transition-all duration-300 hover:scale-105 hover:shadow-[0_0_30px_rgba(34,197,94,0.4)] flex items-center gap-2"
                 >
-                  <div className="h-40 bg-gradient-to-br from-purple-900/40 to-pink-900/40 flex items-center justify-center text-5xl group-hover:scale-105 transition-transform duration-300">
-                    {course.category === 'Web Development' && '🌐'}
-                    {course.category === 'Backend' && '⚙️'}
-                    {course.category === 'Data Science' && '📊'}
-                    {!course.category && '💻'}
-                  </div>
-                  <div className="p-6">
-                    <div className="flex items-center gap-2 mb-3">
-                      {course.difficulty && (
-                        <span className="px-2 py-1 bg-gray-800 text-gray-300 rounded text-xs font-medium">
-                          {course.difficulty}
-                        </span>
-                      )}
-                      <span className="text-xs text-gray-500">
-                        ⏱️ {course.duration_hours || 10}h
-                      </span>
-                    </div>
-                    <h3 className="text-xl font-bold text-white mb-2 group-hover:text-green-400 transition line-clamp-2">
-                      {course.title}
-                    </h3>
-                    <p className="text-sm text-gray-400 line-clamp-2 mb-4">
-                      {course.description || 'Master the fundamentals and build real-world projects.'}
-                    </p>
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-1 text-yellow-400">
-                        ★ {course.average_rating || '4.8'} 
-                        <span className="text-gray-500">({course.review_count || 0})</span>
-                      </div>
-                      <span className="text-gray-400">👥 {course.enrollment_count || 0} enrolled</span>
-                    </div>
-                  </div>
+                  Explore Courses
+                  <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
                 </Link>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-16 bg-gray-900 rounded-2xl border border-gray-800 border-dashed">
-              <p className="text-gray-400 mb-4">Courses are being prepared by our instructors.</p>
-              <Link href="/explore" className="text-green-400 hover:text-green-300 font-medium">
-                Check back soon →
-              </Link>
-            </div>
-          )}
-          
-          <div className="mt-8 text-center sm:hidden">
-            <Link href="/explore" className="inline-flex items-center gap-2 text-green-400 hover:text-green-300 font-medium transition">
-              View All Courses →
-            </Link>
+                <Link
+                  href="/dashboard"
+                  className="px-8 py-4 bg-gray-800 hover:bg-gray-700 text-white border border-gray-700 rounded-xl font-bold text-lg transition-all duration-300 hover:scale-105"
+                >
+                  Go to Dashboard
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/sign-up"
+                  className="group relative px-8 py-4 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold text-lg transition-all duration-300 hover:scale-105 hover:shadow-[0_0_30px_rgba(34,197,94,0.4)] flex items-center gap-2"
+                >
+                  Create Free Account
+                  <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+                </Link>
+                <Link
+                  href="/sign-in"
+                  className="px-8 py-4 bg-transparent hover:bg-white/10 text-white border border-white/20 rounded-xl font-bold text-lg transition-all duration-300 hover:scale-105"
+                >
+                  Sign In
+                </Link>
+              </>
+            )}
           </div>
         </div>
-      </section>
+      </div>
 
-      {/* ==================== WHY CHOOSE US ==================== */}
-      <section className="py-24 px-4 sm:px-6 lg:px-8">
-        <div className="container mx-auto max-w-6xl">
+      {/* 🎯 2. FEATURES SECTION WITH HOVER CARDS */}
+      <div className="relative z-10 bg-black py-24 px-4">
+        <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">Why Learn With Us?</h2>
-            <p className="text-gray-400 max-w-2xl mx-auto">
-              We don't just teach syntax. We build confident, job-ready developers through proven methods.
-            </p>
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4">Why Choose TheoCode?</h2>
+            <p className="text-gray-400 text-lg">Everything you need to become a professional developer.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              {
-                icon: '🎯',
-                title: 'Project-Based Learning',
-                desc: 'Build real-world applications, not just toy examples. Learn by doing.'
-              },
-              {
-                icon: '🛡️',
-                title: 'Community Squads',
-                desc: 'Join study groups, collaborate on challenges, and never learn alone.'
-              },
-              {
-                icon: '🏆',
-                title: 'Gamified Progress',
-                desc: 'Earn XP, climb the global leaderboard, and unlock certificates.'
-              }
-            ].map((feature, idx) => (
-              <div key={idx} className="p-8 bg-gray-900/50 border border-gray-800 rounded-2xl hover:border-green-500/30 transition duration-300">
-                <div className="text-4xl mb-4">{feature.icon}</div>
-                <h3 className="text-xl font-bold text-white mb-3">{feature.title}</h3>
-                <p className="text-gray-400 leading-relaxed">{feature.desc}</p>
+            {/* Feature 1 */}
+            <div className="group p-8 bg-gray-900/50 border border-gray-800 rounded-2xl hover:border-green-500/50 hover:bg-gray-900 transition-all duration-300 hover:-translate-y-2">
+              <div className="w-14 h-14 bg-green-500/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                <span className="text-3xl">💻</span>
               </div>
-            ))}
+              <h3 className="text-xl font-bold text-white mb-3">In-Browser Code Execution</h3>
+              <p className="text-gray-400 leading-relaxed">Write, run, and test your code instantly without setting up local environments.</p>
+            </div>
+
+            {/* Feature 2 */}
+            <div className="group p-8 bg-gray-900/50 border border-gray-800 rounded-2xl hover:border-purple-500/50 hover:bg-gray-900 transition-all duration-300 hover:-translate-y-2">
+              <div className="w-14 h-14 bg-purple-500/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                <span className="text-3xl">🏆</span>
+              </div>
+              <h3 className="text-xl font-bold text-white mb-3">Gamified Learning</h3>
+              <p className="text-gray-400 leading-relaxed">Earn points, unlock achievements, and climb the global leaderboard as you learn.</p>
+            </div>
+
+            {/* Feature 3 */}
+            <div className="group p-8 bg-gray-900/50 border border-gray-800 rounded-2xl hover:border-blue-500/50 hover:bg-gray-900 transition-all duration-300 hover:-translate-y-2">
+              <div className="w-14 h-14 bg-blue-500/10 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                <span className="text-3xl">👥</span>
+              </div>
+              <h3 className="text-xl font-bold text-white mb-3">Community Squads</h3>
+              <p className="text-gray-400 leading-relaxed">Join study groups, collaborate in real-time, and learn alongside peers.</p>
+            </div>
           </div>
         </div>
-      </section>
-
-      {/* ==================== FINAL CTA ==================== */}
-      <section className="py-24 px-4 sm:px-6 lg:px-8 border-t border-gray-900">
-        <div className="container mx-auto max-w-4xl text-center">
-          <div className="bg-gradient-to-br from-green-900/20 to-emerald-900/20 border border-green-500/20 rounded-3xl p-10 sm:p-16">
-            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-6">
-              Ready to start your coding journey?
-            </h2>
-            <p className="text-gray-400 text-lg mb-8 max-w-xl mx-auto">
-              Join thousands of developers who are already building the future. 
-              It's free to get started.
-            </p>
-            <Link 
-              href="/explore" 
-              className="inline-flex items-center gap-2 px-8 py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-lg transition transform hover:scale-105 shadow-lg shadow-green-900/20"
-            >
-              Get Started for Free 🚀
-            </Link>
-          </div>
-        </div>
-      </section>
-
+      </div>
     </main>
   );
 }

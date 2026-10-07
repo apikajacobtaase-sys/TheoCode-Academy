@@ -1,20 +1,24 @@
-import { createUploadthing } from "uploadthing/next";
+import { createUploadthing, type FileRouter } from "uploadthing/next";
+import { currentUser } from "@clerk/nextjs/server";
 
 const f = createUploadthing();
 
 export const ourFileRouter = {
-  courseMaterial: f({
-    image: { maxFileSize: "16MB" },
-    video: { maxFileSize: "128MB" },
+  courseMedia: f({
+    image: { maxFileSize: "4MB" },
     pdf: { maxFileSize: "16MB" },
-    text: { maxFileSize: "4MB" },
+    video: { maxFileSize: "64MB" },
   })
-    .middleware(() => {
-      return { userId: "user" };
+    .middleware(async () => {
+      const user = await currentUser();
+      if (!user) throw new Error("Unauthorized");
+      return { userId: user.id };
     })
     .onUploadComplete(async ({ metadata, file }) => {
-      console.log("✅ UploadThing webhook SUCCESS!");
-      console.log("📁 File URL:", file.url);
-      return { uploadedBy: metadata.userId, url: file.url };
+      console.log("Upload complete for userId:", metadata.userId);
+      console.log("file url", file.url);
+      return { uploadedBy: metadata.userId };
     }),
-};
+} satisfies FileRouter;
+
+export type OurFileRouter = typeof ourFileRouter;

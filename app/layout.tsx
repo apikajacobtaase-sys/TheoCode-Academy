@@ -1,6 +1,6 @@
 import { ClerkProvider } from '@clerk/nextjs';
 import { ThemeProvider } from '@/components/ThemeProvider';
-import { NotificationBell } from '@/components/NotificationBell';
+import NotificationBell from "@/components/NotificationBell";
 import ToastNotifications from '@/components/ToastNotifications';
 import PushNotificationSetup from '@/components/PushNotificationSetup';
 import Navbar from '@/components/Navbar';
@@ -9,6 +9,7 @@ import { UserSync } from '@/components/UserSync';
 import type { Metadata } from 'next';
 import AutoRefresh from '@/components/AutoRefresh';
 import Footer from '@/components/Footer';
+import { ToastProvider } from '@/components/Toast'; // 🎯 1. ADD THIS IMPORT
 
 export const metadata: Metadata = {
   title: 'TheCode Academy - Learn to Code with AI',
@@ -35,22 +36,28 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body suppressHydrationWarning className="bg-black text-white antialiased">
-       <ClerkProvider>
-  <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
-    <Navbar />
-    <div className="flex flex-col min-h-screen">
-      <main className="flex-1">
-        {children}
-      </main>
-      <Footer />
-    </div>
-    <NotificationBell />
-    <UserSync />
-    <ToastNotifications />
-    <PushNotificationSetup />
-    <AutoRefresh />
-  </ThemeProvider>
-</ClerkProvider>
+        <ClerkProvider>
+          <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+            
+            {/* 🎯 2. WRAP EVERYTHING INSIDE HERE WITH TOAST PROVIDER */}
+            <ToastProvider>
+              <Navbar />
+              <div className="flex flex-col min-h-screen">
+                <main className="flex-1">
+                  {children}
+                </main>
+                <Footer />
+              </div>
+              <NotificationBell />
+              <UserSync />
+              <ToastNotifications />
+              <PushNotificationSetup />
+              <AutoRefresh />
+            </ToastProvider>
+            {/* 🎯 3. CLOSE TOAST PROVIDER HERE */}
+
+          </ThemeProvider>
+        </ClerkProvider>
       </body>
     </html>
   );

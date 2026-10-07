@@ -33,7 +33,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     `;
 
     let pending_requests: any[] = [];
-    if (squad.role === 'leader') {
+    if (squad.role === 'leader' || squad.role === 'owner') {
       pending_requests = await sql`
         SELECT user_id, user_name, joined_at 
         FROM squad_members 
@@ -55,24 +55,30 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { id } = await params;
-    const { name, image_url } = await request.json();
+    const { name, description, image_url } = await request.json();
 
     const sql = neon(process.env.DATABASE_URL!);
 
-    const leaderCheck = await sql`
-      SELECT 1 FROM squad_members WHERE squad_id = ${id} AND user_id = ${userId} AND role = 'leader'
+    // 🎯 FIXED: Allow BOTH 'owner' and 'leader' to edit the squad
+    const ownerCheck = await sql`
+      SELECT 1 FROM squad_members 
+      WHERE squad_id = ${id} 
+        AND user_id = ${userId} 
+        AND role IN ('owner', 'leader')
+        AND status = 'approved'
     `;
 
-    if (leaderCheck.length === 0) {
-      return NextResponse.json({ error: 'Only the leader can edit the squad' }, { status: 403 });
+    if (ownerCheck.length === 0) {
+      return NextResponse.json({ error: 'Only the owner or leader can edit the squad' }, { status: 403 });
     }
 
     const updated = await sql`
       UPDATE squads 
       SET name = COALESCE(${name}, name), 
+          description = COALESCE(${description}, description),
           image_url = COALESCE(${image_url}, image_url)
       WHERE id = ${id}
-      RETURNING id, name, image_url, invite_code
+      RETURNING id, name, description, image_url, invite_code
     `;
 
     return NextResponse.json({ success: true, squad: updated[0] });

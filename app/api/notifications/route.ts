@@ -5,50 +5,26 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   try {
     const { userId } = await auth();
-    if (!userId) return NextResponse.json({ notifications: [], unreadCount: 0 });
-
-    const sql = neon(process.env.DATABASE_URL!);
-
-    // 🎯 Use is_read instead of read
-    const notifications = await sql`
-      SELECT id, title, message, type, link, is_read as read, created_at
-      FROM notifications
-      WHERE user_id = ${userId}
-      ORDER BY created_at DESC
-      LIMIT 20
-    `;
-
-    const unreadCount = notifications.filter((n: any) => !n.read).length;
-
-    return NextResponse.json({ notifications, unreadCount });
-  } catch (error: any) {
-    console.error('❌ Notifications GET Error:', error.message);
-    return NextResponse.json({ notifications: [], unreadCount: 0 });
-  }
-}
-
-export async function POST(request: Request) {
-  try {
-    const { userId } = await auth();
-    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const { targetUserId, title, message, type, link } = await request.json();
-
-    if (!targetUserId || !title) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    if (!userId) {
+      return NextResponse.json({ unreadCount: 0 }, { status: 200 });
     }
 
     const sql = neon(process.env.DATABASE_URL!);
 
-    const notification = await sql`
-      INSERT INTO notifications (user_id, title, message, type, link, is_read)
-      VALUES (${targetUserId}, ${title}, ${message || null}, ${type || 'info'}, ${link || null}, false)
-      RETURNING *
+    // 🎯 ULTRA-FAST: Only count unread notifications, no complex joins
+    // Adjust the table/column names below to match your actual notifications table
+    const result = await sql`
+      SELECT COUNT(*) as count 
+      FROM notifications 
+      WHERE user_id = ${userId} AND is_read = false
     `;
 
-    return NextResponse.json({ notification: notification[0] }, { status: 201 });
+    const unreadCount = parseInt(result[0].count) || 0;
+
+    return NextResponse.json({ unreadCount }, { status: 200 });
   } catch (error: any) {
-    console.error('❌ Notifications POST Error:', error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('❌ Notifications GET Error:', error.message);
+    // 🎯 FAIL-SAFE: Return 0 instead of crashing the whole page
+    return NextResponse.json({ unreadCount: 0 }, { status: 200 });
   }
 }

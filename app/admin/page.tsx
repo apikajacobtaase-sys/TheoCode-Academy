@@ -5,223 +5,172 @@ import Link from 'next/link';
 import { useUser } from '@clerk/nextjs';
 
 export default function AdminDashboard() {
-  const { user, isLoaded } = useUser();
-  const [stats, setStats] = useState({
-    totalUsers: 0,
-    totalCourses: 0,
-    totalSquads: 0,
-    totalMessages: 0,
-    totalNotifications: 0,
-    recentUsers: []
-  });
+  const { isLoaded, user } = useUser();
+  const [stats, setStats] = useState<any>(null);
+  const [analytics, setAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  const isAdmin = user?.publicMetadata?.role === 'admin';
+
   useEffect(() => {
-    fetchStats();
-  }, []);
-
-  const fetchStats = async () => {
-    try {
-      const [usersRes, coursesRes, squadsRes] = await Promise.all([
-        fetch('/api/admin/stats/users'),
-        fetch('/api/admin/stats/courses'),
-        fetch('/api/admin/stats/squads')
-      ]);
-
-      const usersData = usersRes.ok ? await usersRes.json() : { count: 0, recent: [] };
-      const coursesData = coursesRes.ok ? await coursesRes.json() : { count: 0 };
-      const squadsData = squadsRes.ok ? await squadsRes.json() : { count: 0, messages: 0 };
-
-      setStats({
-        totalUsers: usersData.count || 0,
-        totalCourses: coursesData.count || 0,
-        totalSquads: squadsData.count || 0,
-        totalMessages: squadsData.messages || 0,
-        totalNotifications: 0,
-        recentUsers: usersData.recent || []
-      });
-    } catch (error) {
-      console.error('Failed to fetch stats:', error);
-    } finally {
-      setLoading(false);
+    if (isAdmin) {
+      Promise.all([
+        fetch('/api/admin/stats').then(r => r.json()),
+        fetch('/api/admin/analytics').then(r => r.json())
+      ]).then(([statsData, analyticsData]) => {
+        setStats(statsData);
+        setAnalytics(analyticsData);
+        setLoading(false);
+      }).catch(() => setLoading(false));
     }
-  };
+  }, [isAdmin]);
 
   if (!isLoaded || loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-green-400 animate-pulse text-xl">Loading dashboard...</div>
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-green-400 animate-pulse text-xl">Loading admin dashboard...</div>
       </div>
     );
   }
 
-  const statCards = [
-    { label: 'Total Users', value: stats.totalUsers, icon: '👥', color: 'from-green-600 to-emerald-700', link: '/admin/users' },
-    { label: 'Courses', value: stats.totalCourses, icon: '📚', color: 'from-blue-600 to-cyan-700', link: '/admin/courses' },
-    { label: 'Squads', value: stats.totalSquads, icon: '🛡️', color: 'from-purple-600 to-pink-700', link: '/admin/squads' },
-    { label: 'Messages', value: stats.totalMessages, icon: '💬', color: 'from-orange-600 to-red-700', link: '/admin/squads' },
-  ];
-
-  const quickActions = [
-    { label: 'Create Course', icon: '➕', href: '/admin/courses/new', color: 'bg-green-600 hover:bg-green-700' },
-    { label: 'Broadcast Message', icon: '📢', href: '/admin/broadcast', color: 'bg-blue-600 hover:bg-blue-700' },
-    { label: 'Manage Users', icon: '👥', href: '/admin/users', color: 'bg-purple-600 hover:bg-purple-700' },
-    { label: 'View Squads', icon: '🛡️', href: '/admin/squads', color: 'bg-orange-600 hover:bg-orange-700' },
-  ];
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white">
+        <div className="text-6xl mb-4">🔒</div>
+        <h2 className="text-2xl font-bold mb-2">Access Denied</h2>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-7xl mx-auto">
-      
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">
-          Welcome back, {user?.firstName || 'Admin'} 👋
-        </h1>
-        <p className="text-gray-400">Here's what's happening on TheCode Academy today.</p>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
-        {statCards.map((stat) => (
-          <Link
-            key={stat.label}
-            href={stat.link}
-            className="group bg-gray-900 border border-gray-800 rounded-2xl p-6 hover:border-green-500/50 transition-all hover:shadow-xl hover:shadow-green-900/20"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center text-2xl shadow-lg`}>
-                {stat.icon}
-              </div>
-              <span className="text-green-400 text-sm font-medium opacity-0 group-hover:opacity-100 transition">
-                View →
-              </span>
-            </div>
-            <div className="text-3xl font-bold text-white mb-1">
-              {stat.value.toLocaleString()}
-            </div>
-            <div className="text-sm text-gray-400">{stat.label}</div>
-          </Link>
-        ))}
-      </div>
-
-      {/* Quick Actions */}
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mb-8">
-        <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-          ⚡ Quick Actions
-        </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {quickActions.map((action) => (
-            <Link
-              key={action.label}
-              href={action.href}
-              className={`${action.color} text-white rounded-xl p-4 text-center font-bold transition transform hover:scale-105 shadow-lg`}
-            >
-              <div className="text-3xl mb-2">{action.icon}</div>
-              <div className="text-sm">{action.label}</div>
-            </Link>
-          ))}
+    <main className="min-h-screen bg-black text-white pb-20">
+      <div className="bg-gray-900 border-b border-gray-800 px-6 py-6">
+        <div className="max-w-7xl mx-auto">
+          <h1 className="text-3xl font-bold">⚙️ Admin Dashboard</h1>
+          <p className="text-gray-400 mt-1">Platform overview and analytics</p>
         </div>
       </div>
 
-      {/* Two Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* Recent Users */}
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              👥 Recent Users
-            </h2>
-            <Link href="/admin/users" className="text-green-400 hover:text-green-300 text-sm font-medium transition">
-              View all →
-            </Link>
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="bg-gradient-to-br from-blue-900/40 to-blue-900/10 border border-blue-500/30 rounded-2xl p-6">
+            <p className="text-xs text-blue-300 uppercase tracking-wider font-bold">Total Users</p>
+            <p className="text-4xl font-extrabold text-white mt-2">{stats?.totalUsers || 0}</p>
           </div>
-          
-          {stats.recentUsers.length === 0 ? (
-            <div className="text-center py-8 text-gray-400">
-              <div className="text-4xl mb-2">👤</div>
-              <p>No users yet</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {stats.recentUsers.slice(0, 5).map((user: any) => (
-                <div key={user.id} className="flex items-center gap-3 p-3 bg-black rounded-lg border border-gray-800">
-                  <img
-                    src={user.profile_image_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.full_name || 'U')}&background=16a34a&color=fff&size=200`}
-                    alt={user.full_name}
-                    className="w-10 h-10 rounded-full object-cover border-2 border-green-500"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white font-medium truncate">{user.full_name || 'Unnamed User'}</p>
-                    <p className="text-xs text-gray-400 truncate">{user.username || 'No username'}</p>
-                  </div>
-                  <div className="text-xs text-green-400">
-                    {new Date(user.created_at).toLocaleDateString()}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Platform Health */}
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-          <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-            🎯 Platform Health
-          </h2>
-          
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-3 bg-black rounded-lg border border-gray-800">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-green-600/20 rounded-lg flex items-center justify-center text-xl">✅</div>
-                <div>
-                  <p className="text-white font-medium">Database</p>
-                  <p className="text-xs text-gray-400">Neon PostgreSQL</p>
-                </div>
-              </div>
-              <span className="text-green-400 font-bold text-sm">Online</span>
-            </div>
-
-            <div className="flex items-center justify-between p-3 bg-black rounded-lg border border-gray-800">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-green-600/20 rounded-lg flex items-center justify-center text-xl">🔐</div>
-                <div>
-                  <p className="text-white font-medium">Authentication</p>
-                  <p className="text-xs text-gray-400">Clerk</p>
-                </div>
-              </div>
-              <span className="text-green-400 font-bold text-sm">Online</span>
-            </div>
-
-            <div className="flex items-center justify-between p-3 bg-black rounded-lg border border-gray-800">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-green-600/20 rounded-lg flex items-center justify-center text-xl">🚀</div>
-                <div>
-                  <p className="text-white font-medium">Deployment</p>
-                  <p className="text-xs text-gray-400">Vercel</p>
-                </div>
-              </div>
-              <span className="text-green-400 font-bold text-sm">Active</span>
-            </div>
-
-            <div className="flex items-center justify-between p-3 bg-black rounded-lg border border-gray-800">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-green-600/20 rounded-lg flex items-center justify-center text-xl">🤖</div>
-                <div>
-                  <p className="text-white font-medium">AI Services</p>
-                  <p className="text-xs text-gray-400">OpenAI</p>
-                </div>
-              </div>
-              <span className="text-green-400 font-bold text-sm">Ready</span>
-            </div>
+          <div className="bg-gradient-to-br from-purple-900/40 to-purple-900/10 border border-purple-500/30 rounded-2xl p-6">
+            <p className="text-xs text-purple-300 uppercase tracking-wider font-bold">Admins</p>
+            <p className="text-4xl font-extrabold text-white mt-2">{stats?.totalAdmins || 0}</p>
+          </div>
+          <div className="bg-gradient-to-br from-green-900/40 to-green-900/10 border border-green-500/30 rounded-2xl p-6">
+            <p className="text-xs text-green-300 uppercase tracking-wider font-bold">Total Challenges</p>
+            <p className="text-4xl font-extrabold text-white mt-2">{stats?.totalChallenges || 0}</p>
+          </div>
+          <div className="bg-gradient-to-br from-orange-900/40 to-orange-900/10 border border-orange-500/30 rounded-2xl p-6">
+            <p className="text-xs text-orange-300 uppercase tracking-wider font-bold">Challenges Solved</p>
+            <p className="text-4xl font-extrabold text-white mt-2">{stats?.totalSolved || 0}</p>
           </div>
         </div>
-      </div>
 
-      {/* Footer Info */}
-      <div className="mt-8 text-center text-sm text-gray-500">
-        <p>TheCode Academy Admin Panel • Last updated: {new Date().toLocaleString()}</p>
+        {/* Quick Actions */}
+        <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-6">
+          <h2 className="text-xl font-bold mb-4">Quick Actions</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Link href="/admin/courses" className="flex items-center gap-3 p-4 bg-indigo-600 hover:bg-indigo-500 rounded-xl transition">
+              <span className="text-2xl">📚</span>
+              <div>
+                <p className="font-bold">Manage Courses</p>
+                <p className="text-sm text-indigo-100">Create courses & add modules</p>
+              </div>
+            </Link>
+            <Link href="/admin/challenges/new" className="flex items-center gap-3 p-4 bg-green-600 hover:bg-green-500 rounded-xl transition">
+              <span className="text-2xl">➕</span>
+              <div>
+                <p className="font-bold">Create Challenge</p>
+                <p className="text-sm text-green-100">Add a new coding challenge</p>
+              </div>
+            </Link>
+            <Link href="/admin/challenges" className="flex items-center gap-3 p-4 bg-blue-600 hover:bg-blue-500 rounded-xl transition">
+              <span className="text-2xl">📝</span>
+              <div>
+                <p className="font-bold">Manage Challenges</p>
+                <p className="text-sm text-blue-100">Edit or delete challenges</p>
+              </div>
+            </Link>
+            <Link href="/admin/users" className="flex items-center gap-3 p-4 bg-purple-600 hover:bg-purple-500 rounded-xl transition">
+              <span className="text-2xl">👥</span>
+              <div>
+                <p className="font-bold">Manage Users</p>
+                <p className="text-sm text-purple-100">View and manage accounts</p>
+              </div>
+            </Link>
+          </div>
+        </div>
+
+        {/* Analytics Section */}
+        {analytics && (
+          <>
+            {/* Completion Stats */}
+            <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-6">
+              <h2 className="text-xl font-bold mb-4">📊 Course Completion Stats</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-green-400">{analytics.completionStats?.completed || 0}</p>
+                  <p className="text-sm text-gray-400">Courses Completed</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-blue-400">{analytics.completionStats?.total_enrollments || 0}</p>
+                  <p className="text-sm text-gray-400">Total Enrollments</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-purple-400">{analytics.completionStats?.avg_progress || 0}%</p>
+                  <p className="text-sm text-gray-400">Average Progress</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Popular Courses */}
+            <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-6">
+              <h2 className="text-xl font-bold mb-4">🔥 Popular Courses</h2>
+              <div className="space-y-3">
+                {analytics.popularCourses?.slice(0, 5).map((c: any, i: number) => (
+                  <div key={c.id} className="flex items-center justify-between p-3 bg-black/30 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <span className="w-8 h-8 rounded-full bg-gradient-to-br from-green-500 to-blue-600 flex items-center justify-center font-bold text-white">
+                        {i + 1}
+                      </span>
+                      <p className="font-medium text-white">{c.title}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-green-400">{c.enrollments} enrollments</p>
+                      <p className="text-xs text-gray-500">{c.avg_progress || 0}% avg progress</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Quiz Stats */}
+            <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-6">
+              <h2 className="text-xl font-bold mb-4">📝 Quiz Performance</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-yellow-400">{analytics.quizStats?.total_attempts || 0}</p>
+                  <p className="text-sm text-gray-400">Total Quiz Attempts</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-blue-400">{analytics.quizStats?.avg_score || 0}%</p>
+                  <p className="text-sm text-gray-400">Average Score</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-green-400">{analytics.quizStats?.highest_score || 0}%</p>
+                  <p className="text-sm text-gray-400">Highest Score</p>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
-    </div>
+    </main>
   );
 }

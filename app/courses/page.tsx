@@ -1,130 +1,90 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useUser } from '@clerk/nextjs';
 import Link from 'next/link';
 
-export default function Courses() {
-  const { user, isLoaded } = useUser();
+export default function CoursesPage() {
   const [courses, setCourses] = useState<any[]>([]);
-  
-  // 🎯 FIX 1: Explicitly type the Set as Set<string>
-  const [enrolledCourseIds, setEnrolledCourseIds] = useState<Set<string>>(new Set<string>());
-  const [loadingEnroll, setLoadingEnroll] = useState<string | null>(null);
-  const [loadingCourses, setLoadingCourses] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all');
 
   useEffect(() => {
     fetch('/api/courses')
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to fetch courses');
-        return res.json();
-      })
+      .then(r => r.json())
       .then(data => {
         setCourses(data.courses || []);
-        setLoadingCourses(false);
+        setLoading(false);
       })
-      .catch(error => {
-        console.error('Courses fetch error:', error);
-        setCourses([]);
-        setLoadingCourses(false);
-      });
+      .catch(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
-    if (user) {
-      fetch(`/api/enrollments?userId=${user.id}`)
-        .then(res => {
-          if (!res.ok) throw new Error('Failed to fetch enrollments');
-          return res.json();
-        })
-        .then(data => {
-          // 🎯 FIX 2: Explicitly type the new Set as Set<string>
-          const ids = new Set<string>((data.enrollments || []).map((e: any) => String(e.course_id)));
-          setEnrolledCourseIds(ids);
-        })
-        .catch(error => {
-          console.error('Enrollments fetch error:', error);
-        });
-    }
-  }, [user]);
-
-  const handleEnroll = async (courseId: string) => {
-    if (!user) return;
-    setLoadingEnroll(courseId);
-    try {
-      const res = await fetch('/api/enrollments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, courseId })
-      });
-      const data = await res.json();
-      if (data.enrolled) {
-        setEnrolledCourseIds(new Set<string>([...enrolledCourseIds, courseId]));
-      }
-    } catch (error) {
-      console.error('Enrollment error:', error);
-    }
-    setLoadingEnroll(null);
-  };
-
-  if (!isLoaded) return <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">Loading...</div>;
-  if (!user) return <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">Please sign in</div>;
+  const filtered = filter === 'all' ? courses : courses.filter(c => c.difficulty === filter);
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 text-white p-8">
-      <div className="container mx-auto max-w-6xl">
-        <h1 className="text-4xl font-bold mb-8">📚 Available Courses</h1>
+    <main className="min-h-screen bg-black text-white pb-20">
+      <div className="bg-gradient-to-br from-purple-900/40 to-blue-900/40 border-b border-gray-800 px-6 py-16">
+        <div className="max-w-7xl mx-auto text-center">
+          <h1 className="text-5xl font-extrabold mb-4 bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">
+            📚 Learn to Code
+          </h1>
+          <p className="text-xl text-gray-300 max-w-2xl mx-auto">
+            Structured courses with hands-on lessons to take you from beginner to pro.
+          </p>
+        </div>
+      </div>
 
-        {loadingCourses ? (
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Filters */}
+        <div className="flex gap-2 mb-8 flex-wrap">
+          {['all', 'beginner', 'intermediate', 'advanced'].map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-4 py-2 rounded-lg font-bold text-sm transition ${
+                filter === f ? 'bg-green-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+              }`}
+            >
+              {f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          ))}
+        </div>
+
+        {loading ? (
+          <div className="text-center py-20 text-green-400 animate-pulse">Loading courses...</div>
+        ) : filtered.length === 0 ? (
           <div className="text-center py-20">
-            <p className="text-xl text-gray-400">Loading courses...</p>
-          </div>
-        ) : courses.length === 0 ? (
-          <div className="bg-gray-800 rounded-2xl p-12 text-center border border-gray-700">
-            <p className="text-2xl text-gray-400 mb-4">No courses available yet</p>
-            <p className="text-gray-500">Check back soon for new courses!</p>
+            <div className="text-6xl mb-4">📭</div>
+            <p className="text-xl text-gray-400">No courses available yet</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {courses.map((course) => {
-              const isEnrolled = enrolledCourseIds.has(course.id);
-              return (
-                <div key={course.id} className="bg-gray-800 rounded-2xl border border-gray-700 shadow-xl overflow-hidden hover:border-purple-500/50 transition-all flex flex-col">
-                  <div className="p-6 flex-1">
-                    <span className="px-3 py-1 bg-purple-900/50 text-purple-300 rounded-full text-xs uppercase font-bold">
-                      {course.language}
-                    </span>
-                    <h3 className="text-xl font-bold mt-4 mb-2">{course.title}</h3>
-                    <p className="text-gray-400 text-sm line-clamp-3 mb-4">{course.description}</p>
-                    
-                    {/* 🎯 FIX 3: Clean JSX for module/lesson counts (no stray comments) */}
-                    <div className="flex gap-4 text-sm text-gray-400 mb-4">
-                      <span>📚 {course.module_count || 0} modules</span>
-                      <span>📖 {course.lesson_count || 0} lessons</span>
+            {filtered.map((c) => (
+              <Link key={c.id} href={`/courses/${c.id}`} className="group">
+                <div className="bg-gray-900/50 border border-gray-800 rounded-2xl overflow-hidden hover:border-green-500/50 transition h-full">
+                  <div className="h-40 bg-gradient-to-br from-purple-600 to-blue-600 relative">
+                    {c.image_url && <img src={c.image_url} alt={c.title} className="w-full h-full object-cover opacity-80" />}
+                    <div className="absolute top-3 left-3">
+                      <span className={`px-2 py-1 rounded text-xs font-bold ${
+                        c.difficulty === 'beginner' ? 'bg-green-500 text-white' :
+                        c.difficulty === 'intermediate' ? 'bg-yellow-500 text-white' :
+                        'bg-red-500 text-white'
+                      }`}>
+                        {c.difficulty.toUpperCase()}
+                      </span>
                     </div>
                   </div>
-
-                  <div className="p-6 pt-0 mt-auto">
-                    {isEnrolled ? (
-                      <Link 
-                        href={`/courses/${course.id}`} 
-                        className="block w-full py-3 text-center bg-green-600/20 text-green-400 border border-green-600/50 rounded-lg font-bold hover:bg-green-600/30 transition"
-                      >
-                        ✅ Continue Learning
-                      </Link>
-                    ) : (
-                      <button 
-                        onClick={() => handleEnroll(course.id)}
-                        disabled={loadingEnroll === course.id}
-                        className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 rounded-lg font-bold transition"
-                      >
-                        {loadingEnroll === course.id ? 'Enrolling...' : 'Register for Course'}
-                      </button>
-                    )}
+                  <div className="p-5">
+                    <h3 className="font-bold text-lg text-white mb-2 group-hover:text-green-400 transition">{c.title}</h3>
+                    <p className="text-sm text-gray-400 mb-4 line-clamp-2">{c.description}</p>
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                      <span>📖 {c.total_lessons} lessons</span>
+                      <span>⏱️ {c.duration_hours}h</span>
+                      <span>👨‍🏫 {c.instructor}</span>
+                    </div>
                   </div>
                 </div>
-              );
-            })}
+              </Link>
+            ))}
           </div>
         )}
       </div>

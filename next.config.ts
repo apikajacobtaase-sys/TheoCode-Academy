@@ -1,25 +1,27 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // 1. Your existing rewrites
-  async rewrites() {
-    return [
-      {
-        source: '/api/evaluate',
-        destination: 'https://br-delicate-king-b4ox58hk-evaluate.compute.c-6.us-east-2.aws.neon.tech/',
-      },
-    ];
-  },
-  
-  // 2. The new image whitelist for DiceBear avatars
   images: {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'api.dicebear.com',
-        pathname: '/**',
+        hostname: 'images.unsplash.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'source.unsplash.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'utfs.io',
       },
     ],
+  },
+  // 🎯 Increase API body size limit to 10MB for Base64 media uploads
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '10mb',
+    },
   },
 };
 
