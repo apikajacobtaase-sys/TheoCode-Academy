@@ -1,7 +1,28 @@
+'use client';
+
+import { useUser } from '@clerk/nextjs';
 import Link from 'next/link';
 import Image from 'next/image';
 
 export default function Footer() {
+  const { isSignedIn, isLoaded } = useUser();
+  
+  // 🎯 Debug logging
+  console.log('🔍 Footer Auth State:', { isLoaded, isSignedIn });
+
+  // 🎯 Hide footer if auth hasn't loaded OR if user is not signed in
+  if (!isLoaded) {
+    console.log('⏳ Footer: Auth still loading, returning null');
+    return null;
+  }
+
+  if (!isSignedIn) {
+    console.log('🚫 Footer: User not signed in, returning null');
+    return null;
+  }
+
+  console.log('✅ Footer: User is signed in, rendering footer');
+
   const currentYear = new Date().getFullYear();
 
   const footerLinks = {

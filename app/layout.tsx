@@ -10,7 +10,7 @@ import type { Metadata } from 'next';
 import AutoRefresh from '@/components/AutoRefresh';
 import Footer from '@/components/Footer';
 import { ToastProvider } from '@/components/Toast'; // 🎯 1. ADD THIS IMPORT
-
+import { auth } from '@clerk/nextjs/server';
 export const metadata: Metadata = {
   title: 'TheCode Academy - Learn to Code with AI',
   description: 'Join thousands of developers learning to code with AI-powered reviews, coding challenges, and squad collaboration.',

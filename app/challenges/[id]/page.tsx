@@ -161,30 +161,74 @@ export default function ChallengeEditorPage() {
               </span>
               <span>{isConsoleOpen ? '▼' : '▲'}</span>
             </button>
-            
-            {isConsoleOpen && results && (
+                        {isConsoleOpen && results && (
               <div className="p-4 overflow-y-auto flex-1 font-mono text-xs">
-                {results.status === 'running' && <p className="text-yellow-400 animate-pulse">{results.message}</p>}
+                {results.status === 'running' && (
+                  <p className="text-yellow-400 animate-pulse">{results.message}</p>
+                )}
                 
                 {results.status === 'runtime_error' && (
                   <div className="text-red-400 whitespace-pre-wrap">
                     <p className="font-bold mb-2">❌ Compilation / Runtime Error:</p>
-                    <pre className="bg-red-900/20 p-3 rounded border border-red-900/50 overflow-x-auto">{results.errorMessage}</pre>
+                    <pre className="bg-red-900/20 p-3 rounded border border-red-900/50 overflow-x-auto">
+                      {results.errorMessage || results.output}
+                    </pre>
                   </div>
                 )}
 
+                {/* 🎯 FIXED: Changed 'result' to 'results' and checked status === 'accepted' */}
                 {results.status === 'accepted' && (
-                  <div className="text-green-400">
-                    <p className="text-lg font-bold mb-2">🎉 Accepted! +{results.earnedPoints} Points</p>
-                    <p>Score: {results.score}%</p>
-                    {results.hiddenTotal > 0 && <p className="mt-1 text-green-300">Passed {results.hiddenPassed}/{results.hiddenTotal} Hidden Test Cases.</p>}
+                  <div className="p-6 rounded-xl border-2 bg-green-900/20 border-green-500/50">
+                    <div className="flex items-center gap-3 mb-4">
+                      <span className="text-4xl">🎉</span>
+                      <div>
+                        <h3 className="text-2xl font-bold text-green-400">Accepted!</h3>
+                        {results.earnedPoints > 0 && (
+                          <p className="text-green-300 font-bold">+{results.earnedPoints} Points</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 🎯 Score Display */}
+                    <div className="bg-black/30 rounded-lg p-4 mt-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-400">Your Score</span>
+                        <span className="text-2xl font-bold text-green-400">
+                          {results.earnedPoints || 0} pts
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-800 rounded-full h-2">
+                        <div 
+                          className="bg-gradient-to-r from-green-500 to-blue-500 h-2 rounded-full transition-all"
+                          style={{ 
+                            width: `${Math.min(((results.earnedPoints || 0) / (challenge?.points || 10)) * 100, 100)}%` 
+                          }}
+                        ></div>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">
+                        Total points for this challenge: {challenge?.points || 10}
+                      </p>
+                    </div>
+
+                    {results.output && (
+                      <div className="mt-4">
+                        <p className="text-sm text-gray-400 mb-2">Output:</p>
+                        <pre className="bg-black/50 p-3 rounded text-sm text-gray-300 overflow-x-auto">
+                          {results.output}
+                        </pre>
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {results.status === 'wrong_answer' && (
                   <div className="text-orange-400">
-                    <p className="font-bold mb-2">⚠️ Wrong Answer (Score: {results.score}%)</p>
-                    {results.hiddenTotal > 0 && <p className="mb-3 text-orange-300">Passed {results.hiddenPassed}/{results.hiddenTotal} Hidden Test Cases.</p>}
+                    <p className="font-bold mb-2">⚠️ Wrong Answer (Score: {results.score || 0}%)</p>
+                    {results.hiddenTotal > 0 && (
+                      <p className="mb-3 text-orange-300">
+                        Passed {results.hiddenPassed || 0}/{results.hiddenTotal} Hidden Test Cases.
+                      </p>
+                    )}
                     
                     <div className="space-y-2 mt-4">
                       <p className="text-gray-400 font-bold uppercase text-[10px] tracking-wider">Public Test Results:</p>
@@ -205,6 +249,7 @@ export default function ChallengeEditorPage() {
                 )}
               </div>
             )}
+           
           </div>
         </div>
       </div>

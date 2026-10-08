@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useUser, SignInButton } from '@clerk/nextjs';
 import { useToast } from '@/components/Toast';
 import DiscussionForum from '@/components/DiscussionForum';
+import Certificate from '@/components/Certificate';
 // 🎯 Define the exact shape of our progress state
 interface ProgressState {
   progress: number;
@@ -24,6 +25,8 @@ export default function CourseDetailPage() {
   const [loading, setLoading] = useState(true);
   const [activeLesson, setActiveLesson] = useState<any>(null);
   const [enrolled, setEnrolled] = useState(false);
+  const [certificate, setCertificate] = useState<any>(null);
+  const [showCertificate, setShowCertificate] = useState(false);
   const [progress, setProgress] = useState<ProgressState>({ 
     progress: 0, 
     completedLessons: [], 
@@ -76,7 +79,29 @@ export default function CourseDetailPage() {
       showToast('error', 'Failed to enroll', 3000);
     }
   };
-
+  const claimCertificate = async () => {
+    if (!isSignedIn) return;
+    
+    try {
+      const res = await fetch('/api/certificates/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ courseId: id })
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok) {
+        setCertificate(data.certificate);
+        setShowCertificate(true);
+        showToast('success', '🏆 Certificate generated!', 4000);
+      } else {
+        showToast('error', data.error || 'Failed to generate certificate', 4000);
+      }
+    } catch {
+      showToast('error', 'Failed to generate certificate', 4000);
+    }
+  };
   const markLessonComplete = async (lessonId: string) => {
     if (!isSignedIn) {
       showToast('warning', 'Sign in to track progress', 3000);
@@ -262,6 +287,7 @@ export default function CourseDetailPage() {
                   >
                     ✓ Mark Lesson as Complete
                   </button>
+                  
                 ) : (
                   <div className="w-full py-3 bg-gray-800 text-green-400 rounded-lg font-bold flex items-center justify-center gap-2 border border-green-500/30">
                     ✅ Completed
@@ -276,6 +302,38 @@ export default function CourseDetailPage() {
           ) : (
             <div className="flex items-center justify-center h-full text-gray-500">Select a lesson</div>
           )}
+                        {/* 🎯 Certificate Section */}
+              {isSignedIn && progress.progress === 100 && !showCertificate && (
+                <div className="bg-gradient-to-br from-yellow-900/20 to-orange-900/20 border-2 border-yellow-500/50 rounded-xl p-6 text-center">
+                  <div className="text-6xl mb-4">🏆</div>
+                  <h3 className="text-2xl font-bold text-yellow-400 mb-2">Congratulations!</h3>
+                  <p className="text-gray-300 mb-4">You've completed this entire course!</p>
+                  <button
+                    onClick={claimCertificate}
+                    className="px-8 py-3 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 rounded-lg font-bold transition shadow-lg"
+                  >
+                    🎓 Claim Your Certificate
+                  </button>
+                </div>
+              )}
+
+              {showCertificate && certificate && (
+                <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-6">
+                  <Certificate
+                    userName={user?.fullName || user?.username || 'Student'}
+                    courseTitle={course.title}
+                    certificateNumber={certificate.certificate_number}
+                    issuedAt={certificate.issued_at}
+                    instructorName={course.instructor}
+                  />
+                  <button
+                    onClick={() => setShowCertificate(false)}
+                    className="mt-4 text-sm text-gray-400 hover:text-white underline"
+                  >
+                    Close Certificate
+                  </button>
+                </div>
+              )}
         </div>
       </div>
     </main>

@@ -15,6 +15,10 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'utfs.io',
       },
+      {
+        protocol: 'https',
+        hostname: 'img.clerk.com', // 🎯 Added Clerk avatars here!
+      },
     ],
   },
   // 🎯 Increase API body size limit to 10MB for Base64 media uploads

@@ -1,262 +1,235 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useUser, SignInButton } from '@clerk/nextjs';
-import Link from 'next/link';
-import ImageCropper from '@/components/ImageCropper';
+import { useState, useEffect } from 'react';
+import { useUser } from '@clerk/nextjs';
+import { useRouter } from 'next/navigation';
+import Image from 'next/image';
+import { UploadButton } from '@/lib/uploadthing';
+import { useToast } from '@/components/Toast';
 
 export default function ProfilePage() {
   const { user, isLoaded } = useUser();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  
+  const router = useRouter();
+  const { showToast } = useToast();
+
+  const [displayName, setDisplayName] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [bio, setBio] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState('');
-  
-  // Cropper state
-  const [showCropper, setShowCropper] = useState(false);
-  const [rawImageSrc, setRawImageSrc] = useState<string>('');
-  
-  const [formData, setFormData] = useState({
-    full_name: '',
-    username: '',
-    profile_image_url: '',
-    is_name_verified: false
-  });
 
   useEffect(() => {
-    if (isLoaded && user) fetchProfile();
+    if (isLoaded && user) {
+      // Load current profile data
+      fetch('/api/profiles/me')
+        .then(r => r.json())
+        .then(data => {
+          setDisplayName(data.display_name || user.fullName || '');
+          setAvatarUrl(data.avatar_url || user.imageUrl || '');
+          setBio(data.bio || '');
+          setLoading(false);
+        })
+        .catch(() => setLoading(false));
+    }
   }, [isLoaded, user]);
 
-  const fetchProfile = async () => {
-    try {
-      const res = await fetch('/api/user/profile');
-      if (res.ok) {
-        const data = await res.json();
-        setFormData({
-          full_name: data.profile.full_name || user?.fullName || '',
-          username: data.profile.username || user?.username || '',
-          profile_image_url: data.profile.profile_image_url || user?.imageUrl || '',
-          is_name_verified: data.profile.is_name_verified || false
-        });
-      }
-    } catch (error) {
-      console.error('Failed to fetch profile:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 🎯 Handle file selection
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      setMessage('❌ Please select an image file (JPG, PNG, GIF, WebP)');
-      setTimeout(() => setMessage(''), 3000);
-      return;
-    }
-
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setMessage('❌ Image must be smaller than 5MB');
-      setTimeout(() => setMessage(''), 3000);
-      return;
-    }
-
-    // Convert to data URL for cropper
-    const reader = new FileReader();
-    reader.onload = () => {
-      setRawImageSrc(reader.result as string);
-      setShowCropper(true);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  // 🎯 Handle cropped image result
-  const handleCropComplete = (croppedImage: string) => {
-    setFormData({ ...formData, profile_image_url: croppedImage });
-    setShowCropper(false);
-    setRawImageSrc('');
-    setMessage('✅ Image cropped! Don\'t forget to save your profile.');
-    setTimeout(() => setMessage(''), 3000);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = async () => {
     setSaving(true);
-    setMessage('');
-
     try {
-      const res = await fetch('/api/user/profile', {
+      const res = await fetch('/api/profile/update', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({ display_name: displayName, avatar_url: avatarUrl, bio })
       });
 
       if (res.ok) {
-        setMessage('✅ Profile updated successfully!');
-        setTimeout(() => setMessage(''), 3000);
+        showToast('success', '✅ Profile updated!', 3000);
+        router.refresh();
       } else {
-        const err = await res.json();
-        setMessage(`❌ Error: ${err.error}`);
+        showToast('error', 'Failed to update profile', 3000);
       }
-    } catch (error) {
-      setMessage('❌ Failed to save profile.');
+    } catch {
+      showToast('error', 'Network error', 3000);
     } finally {
       setSaving(false);
     }
   };
 
   if (!isLoaded || loading) {
-    return <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">Loading profile...</div>;
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-green-400 animate-pulse text-xl">Loading profile...</div>
+      </div>
+    );
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center text-white p-8">
-        <h1 className="text-2xl font-bold mb-4">Please sign in to view your profile</h1>
-        <SignInButton mode="modal">
-          <button className="px-6 py-3 bg-purple-600 rounded-lg hover:bg-purple-700 transition">Sign In</button>
-        </SignInButton>
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white">
+        <div className="text-6xl mb-4">🔒</div>
+        <h2 className="text-2xl font-bold">Please sign in to view your profile</h2>
       </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 text-white p-4 sm:p-8">
-      <div className="container mx-auto max-w-2xl">
-        <Link href="/dashboard" className="text-purple-400 hover:text-purple-300 text-sm mb-6 inline-block">← Back to Dashboard</Link>
-        
-        <h1 className="text-3xl font-bold mb-8">⚙️ Profile Settings</h1>
-
-        {message && (
-          <div className={`mb-6 p-4 rounded-lg text-center font-bold ${message.includes('✅') ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
-            {message}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="bg-gray-800 rounded-2xl p-6 sm:p-8 border border-gray-700 space-y-6">
-          
-          {/* 🎯 NEW: Profile Image Upload with Crop */}
-          <div>
-            <label className="text-sm font-bold mb-3 block">Profile Picture</label>
-            <div className="flex flex-col sm:flex-row items-center gap-4">
-              {/* Preview */}
-              <div className="relative group">
-                <img 
-                  src={formData.profile_image_url || 'https://ui-avatars.com/api/?name=User&background=6b21a8&color=fff&size=200'} 
-                  alt="Profile" 
-                  className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-purple-500 object-cover bg-gray-900"
-                />
-                <div className="absolute inset-0 bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                  <span className="text-white text-xs font-bold">Change</span>
-                </div>
-              </div>
-
-              {/* Upload Buttons */}
-              <div className="flex flex-col gap-2 w-full sm:w-auto">
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileSelect}
-                  accept="image/*"
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg font-bold text-sm transition"
-                >
-                  📤 Upload Photo
-                </button>
-                <input
-                  type="url"
-                  value={formData.profile_image_url.startsWith('data:') ? '' : formData.profile_image_url}
-                  onChange={(e) => setFormData({ ...formData, profile_image_url: e.target.value })}
-                  className="p-2 bg-gray-900 border border-gray-700 rounded-lg text-white text-xs"
-                  placeholder="Or paste image URL..."
-                />
-                <p className="text-xs text-gray-500">JPG, PNG, GIF, WebP • Max 5MB</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Full Name */}
-          <div>
-            <label className="text-sm font-bold mb-2 block">Full Name</label>
-            <input
-              type="text"
-              value={formData.full_name}
-              onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-              className="w-full p-3 bg-gray-900 border border-gray-700 rounded-lg text-white"
-              placeholder="e.g., John Doe"
-              required
-            />
-          </div>
-
-          {/* Username */}
-          <div>
-            <label className="text-sm font-bold mb-2 block">Username</label>
-            <div className="flex">
-              <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-700 bg-gray-900 text-gray-400 text-sm">@</span>
-              <input
-                type="text"
-                value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase().replace(/\s+/g, '') })}
-                className="flex-1 p-3 bg-gray-900 border border-gray-700 rounded-r-lg text-white"
-                placeholder="johndoe"
-                required
-              />
-            </div>
-            <p className="text-xs text-gray-500 mt-1">Letters and numbers only, no spaces.</p>
-          </div>
-
-          {/* Certificate Verification */}
-          <div className="bg-purple-900/20 border border-purple-500/30 rounded-xl p-4">
-            <div className="flex items-start gap-3">
-              <input
-                type="checkbox"
-                id="verify_name"
-                checked={formData.is_name_verified}
-                onChange={(e) => setFormData({ ...formData, is_name_verified: e.target.checked })}
-                className="mt-1 w-5 h-5 rounded border-gray-600 text-purple-600 focus:ring-purple-500 bg-gray-900"
-              />
-              <div>
-                <label htmlFor="verify_name" className="font-bold text-purple-300 cursor-pointer">
-                  Verify Name for Certificates
-                </label>
-                <p className="text-sm text-gray-400 mt-1">
-                  By checking this box, you confirm that the name provided above is your official name and you authorize TheCode Academy to use it on your certificates of completion.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={saving}
-            className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 rounded-lg font-bold transition disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {saving ? 'Saving...' : '💾 Save Profile'}
-          </button>
-        </form>
+    <main className="min-h-screen bg-black text-white pb-20">
+      {/* Header */}
+      <div className="bg-gradient-to-b from-purple-900/20 to-black border-b border-gray-800 px-6 py-8">
+        <div className="max-w-4xl mx-auto">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
+            My Profile
+          </h1>
+          <p className="text-gray-400 mt-2">Customize your public profile</p>
+        </div>
       </div>
 
-      {/* 🎯 Image Cropper Modal */}
-      {showCropper && rawImageSrc && (
-        <ImageCropper
-          imageSrc={rawImageSrc}
-          onCropComplete={handleCropComplete}
-          onClose={() => {
-            setShowCropper(false);
-            setRawImageSrc('');
-          }}
-        />
-      )}
+      <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">
+        {/* Avatar Section */}
+        <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-8">
+          <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
+            <span className="text-3xl">🖼️</span>
+            Profile Picture
+          </h2>
+
+          <div className="flex flex-col md:flex-row items-center gap-8">
+            {/* Current Avatar */}
+            <div className="relative">
+              <div className="w-40 h-40 rounded-full overflow-hidden bg-gray-800 border-4 border-purple-500/30 ring-4 ring-purple-500/10">
+                <Image
+                  src={avatarUrl || '/default-avatar.png'}
+                  alt="Profile"
+                  width={160}
+                  height={160}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              {avatarUrl && avatarUrl !== user.imageUrl && (
+                <button
+                  onClick={() => setAvatarUrl(user.imageUrl || '')}
+                  className="absolute -bottom-2 -right-2 w-10 h-10 bg-red-600 hover:bg-red-500 rounded-full flex items-center justify-center text-white shadow-lg transition"
+                  title="Remove custom avatar"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Upload Section */}
+            <div className="flex-1 space-y-4">
+              <div>
+                <h3 className="font-bold text-lg mb-2">Upload Custom Avatar</h3>
+                <p className="text-sm text-gray-400 mb-4">
+                  Upload a square image (recommended: 400x400px). Max size: 4MB.
+                </p>
+                <UploadButton
+                  endpoint="courseMedia"
+                  onClientUploadComplete={(res) => {
+                    if (res && res[0]) {
+                      setAvatarUrl(res[0].url);
+                      showToast('success', '✅ Avatar uploaded!', 3000);
+                    }
+                  }}
+                  onUploadError={(error: Error) => {
+                    showToast('error', `Upload failed: ${error.message}`, 4000);
+                  }}
+                  className="ut-button:bg-purple-600 ut-button:hover:bg-purple-500 ut-button:text-white ut-button:font-bold ut-button:py-3 ut-button:px-6 ut-button:rounded-lg ut-allowed-content:text-gray-400"
+                />
+              </div>
+
+              <div className="border-t border-gray-700 pt-4">
+                <p className="text-sm text-gray-400 mb-2">Or use your Clerk avatar:</p>
+                <button
+                  onClick={() => setAvatarUrl(user.imageUrl || '')}
+                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg text-sm font-medium transition"
+                >
+                  Use Default Avatar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Profile Details */}
+        <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-8">
+          <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
+            <span className="text-3xl">👤</span>
+            Profile Details
+          </h2>
+
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">
+                Display Name
+              </label>
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Your public name"
+                className="w-full px-4 py-3 bg-black border border-gray-700 rounded-lg text-white focus:border-purple-500 focus:outline-none transition"
+              />
+              <p className="text-xs text-gray-500 mt-1">This is how your name appears on the leaderboard and discussions.</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">
+                Username
+              </label>
+              <input
+                type="text"
+                value={user.username || ''}
+                disabled
+                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-gray-500 cursor-not-allowed"
+              />
+              <p className="text-xs text-gray-500 mt-1">Username cannot be changed. Set it in Clerk settings.</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">
+                Bio
+              </label>
+              <textarea
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                placeholder="Tell us about yourself..."
+                rows={4}
+                className="w-full px-4 py-3 bg-black border border-gray-700 rounded-lg text-white focus:border-purple-500 focus:outline-none resize-none transition"
+              />
+              <p className="text-xs text-gray-500 mt-1">Optional: Share a short bio with the community.</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">
+                Email
+              </label>
+              <input
+                type="email"
+                value={user.primaryEmailAddress?.emailAddress || ''}
+                disabled
+                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-gray-500 cursor-not-allowed"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Save Button */}
+        <div className="flex justify-end gap-4">
+          <button
+            onClick={() => router.back()}
+            className="px-6 py-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg font-bold transition"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 disabled:from-gray-700 disabled:to-gray-700 rounded-lg font-bold transition shadow-lg shadow-purple-600/20"
+          >
+            {saving ? 'Saving...' : '💾 Save Changes'}
+          </button>
+        </div>
+      </div>
     </main>
   );
 }

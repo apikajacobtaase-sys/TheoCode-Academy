@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useUser } from '@clerk/nextjs';
 import { useToast } from '@/components/Toast';
-
+import { UploadButton } from "@/lib/uploadthing";
 export default function EditCoursePage() {
   const { id } = useParams();
   const router = useRouter();
@@ -412,14 +412,26 @@ export default function EditCoursePage() {
                           )}
 
                           {(newItem.item_type === 'image' || newItem.item_type === 'pdf') && (
-                            <input
-                              type="url"
-                              placeholder="File URL (upload to cloud storage first)"
-                              value={newItem.file_url}
-                              onChange={(e) => setNewItem({ ...newItem, file_url: e.target.value })}
-                              className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:border-purple-500 focus:outline-none"
-                            />
-                          )}
+  <div className="space-y-2">
+    <label className="text-xs font-bold text-gray-400 uppercase">Upload File</label>
+    <UploadButton
+      endpoint="courseMedia"
+      onClientUploadComplete={(res) => {
+        if (res && res[0]) {
+          setNewItem({ ...newItem, file_url: res[0].url });
+          showToast('success', '✅ File uploaded!', 3000);
+        }
+      }}
+      onUploadError={(error: Error) => {
+        showToast('error', `❌ Upload failed: ${error.message}`, 4000);
+      }}
+      className="ut-button:bg-purple-600 ut-button:hover:bg-purple-500 ut-button:text-white ut-button:font-bold ut-button:py-2 ut-button:px-4 ut-button:rounded-lg"
+    />
+    {newItem.file_url && (
+      <p className="text-xs text-green-400">✓ File uploaded: {newItem.file_url.substring(0, 50)}...</p>
+    )}
+  </div>
+)}
 
                         {newItem.item_type === 'quiz' && (
   <div className="space-y-4 border border-purple-500/30 rounded-lg p-4 bg-gray-900/50">

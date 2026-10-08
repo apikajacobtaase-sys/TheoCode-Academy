@@ -146,9 +146,9 @@ export default function Navbar() {
                 <Link href="/my-learning" className="block text-gray-300 hover:text-green-400 font-medium py-2" onClick={() => setMobileMenuOpen(false)}>My Learning</Link>
               )}
               
-              {/* 🎯 Profile Link */}
-              <Link href="/profile/me" className="block text-gray-300 hover:text-green-400 font-medium py-2" onClick={() => setMobileMenuOpen(false)}>👤 My Profile</Link>
-              
+             <Link href="/profile" className="px-4 py-2 text-gray-300 hover:text-white transition">
+  My Profile
+</Link>
               {/* 🎯 Admin Link */}
               {isAdmin && (
                 <Link href="/admin" className="block text-gray-300 hover:text-purple-400 font-medium py-2" onClick={() => setMobileMenuOpen(false)}>⚙️ Admin Panel</Link>
