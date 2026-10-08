@@ -4,7 +4,7 @@ import { neon } from '@neondatabase/serverless';
 
 export async function DELETE(
   request: Request,
-  { params }: { params: Promise<{ lessonId: string; itemId: string }> }
+  { params }: { params: Promise<{ id: string; itemId: string }> } // 🎯 Changed lessonId to id
 ) {
   try {
     const user = await currentUser();
@@ -15,7 +15,6 @@ export async function DELETE(
     const { itemId } = await params;
     const sql = neon(process.env.DATABASE_URL!);
 
-    // 🎯 Delete the item (this will cascade delete associated quiz_questions automatically)
     await sql`DELETE FROM lesson_items WHERE id = ${itemId}`;
 
     return NextResponse.json({ success: true });

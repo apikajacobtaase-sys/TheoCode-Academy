@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
-import { UploadButton } from "@uploadthing/react";
+   import { UploadButton } from '@/lib/uploadthing'; // 🎯 Ensure this is the import
 
 export default function EditSquadPage() {
   const router = useRouter();
@@ -148,8 +148,8 @@ export default function EditSquadPage() {
               {/* Upload Button */}
               <div className="flex-1">
                 <UploadButton
-                  endpoint="imageUploader"
-                  onClientUploadComplete={(res) => {
+                   endpoint="courseMedia"
+                 onClientUploadComplete={(res: any) => {
                     if (res && res[0]) {
                       setImageUrl(res[0].url);
                       setSuccess('Image uploaded! Click Save to apply.');

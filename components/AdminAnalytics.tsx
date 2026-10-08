@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Certificate } from './Certificate';
+import Certificate from './Certificate';
 
 interface Student {
   user_id: string;
