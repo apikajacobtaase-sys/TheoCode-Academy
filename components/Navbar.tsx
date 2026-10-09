@@ -14,7 +14,7 @@ export default function Navbar() {
   // 🎯 Check admin status directly from Clerk metadata
   const isAdmin = user?.publicMetadata?.role === 'admin';
 
-  // 🎯 Fetch username. If it doesn't exist, the API will handle it!
+  // 🎯 Fetch username. If it doesn't exist, the API will create it automatically!
   useEffect(() => {
     if (isSignedIn && user) {
       fetch('/api/profiles/me')
@@ -30,8 +30,6 @@ export default function Navbar() {
     }
   }, [isSignedIn, user]);
 
-  // 🎯 Helper to get the user's initial for the fallback avatar
-  const userInitial = (user?.firstName?.[0] || user?.username?.[0] || 'U').toUpperCase();
   const profileHref = username ? `/profile/${username}` : '/profile/me';
 
   return (
@@ -80,31 +78,18 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-4">
             {isLoaded && (
               isSignedIn ? (
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                   <NotificationBell />
                   
-                  {/* 🎯 POLISHED PROFILE LINK WITH DYNAMIC AVATAR */}
+                  {/* 🎯 REVERTED TO SIMPLE ICON */}
                   <Link 
                     href={profileHref}
-                    className="flex items-center gap-2 group"
+                    className="p-2 text-gray-400 hover:text-green-400 hover:bg-gray-800 rounded-full transition-all duration-200"
                     title="My Profile"
                   >
-                    {user?.imageUrl ? (
-                      <Image 
-                        src={user.imageUrl} 
-                        alt="Profile" 
-                        width={36} 
-                        height={36} 
-                        className="w-9 h-9 rounded-full object-cover border-2 border-gray-700 group-hover:border-green-500 transition-all duration-300"
-                      />
-                    ) : (
-                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-sm font-bold text-white border-2 border-gray-700 group-hover:border-green-400 transition-all duration-300">
-                        {userInitial}
-                      </div>
-                    )}
-                    <span className="text-sm font-medium text-gray-300 group-hover:text-green-400 transition max-w-[100px] truncate">
-                      {username || user?.username || 'Profile'}
-                    </span>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
                   </Link>
                   
                   <UserButton 
@@ -158,22 +143,20 @@ export default function Navbar() {
             <>
               <div className="border-t border-gray-800 my-2"></div>
               
-              {/* 🎯 POLISHED MOBILE PROFILE CARD */}
+              {/* 🎯 REVERTED TO SIMPLE ICON IN MOBILE MENU */}
               <Link 
                 href={profileHref}
                 className="flex items-center gap-3 px-3 py-3 bg-gray-800/50 hover:bg-gray-800 rounded-xl transition border border-gray-700/50"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                {user?.imageUrl ? (
-                  <Image src={user.imageUrl} alt="Profile" width={40} height={40} className="w-10 h-10 rounded-full object-cover border border-gray-600" />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-base font-bold text-white">
-                    {userInitial}
-                  </div>
-                )}
+                <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-gray-300">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
                 <div className="flex flex-col">
-                  <span className="text-white font-bold text-sm">{user?.firstName || user?.username || 'User'}</span>
-                  <span className="text-gray-400 text-xs">View Profile →</span>
+                  <span className="text-white font-bold text-sm">My Profile</span>
+                  <span className="text-gray-400 text-xs">@{username || user?.username}</span>
                 </div>
               </Link>
 
