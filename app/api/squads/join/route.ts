@@ -1,66 +1,51 @@
+import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { neon } from '@neondatabase/serverless';
-import { NextResponse } from 'next/server';
 
-export async function POST(request: Request) {
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { code } = await request.json();
-    if (!code) return NextResponse.json({ error: 'Invite code required' }, { status: 400 });
-
+    const { id: squadId } = await params;
     const sql = neon(process.env.DATABASE_URL!);
 
-    const squad = await sql`
-      SELECT id, name FROM squads WHERE invite_code = ${code.toUpperCase()}
+    // 1. Check if squad exists and is public
+    const squadCheck = await sql`
+      SELECT is_private FROM squads WHERE id = ${squadId}
+    `;
+    
+    if (squadCheck.length === 0) {
+      return NextResponse.json({ error: 'Squad not found' }, { status: 404 });
+    }
+
+    // 2. Check if user is already a member or has a pending request
+    const memberCheck = await sql`
+      SELECT status FROM squad_members WHERE squad_id = ${squadId} AND user_id = ${userId}
     `;
 
-    if (squad.length === 0) {
-      return NextResponse.json({ error: 'Invalid invite code' }, { status: 404 });
+    if (memberCheck.length > 0) {
+      const status = memberCheck[0].status;
+      if (status === 'approved') {
+        return NextResponse.json({ error: 'You are already in this squad' }, { status: 400 });
+      }
+      if (status === 'pending') {
+        return NextResponse.json({ error: 'Your request to join is already pending' }, { status: 400 });
+      }
     }
 
-    const existing = await sql`
-      SELECT status FROM squad_members WHERE squad_id = ${squad[0].id} AND user_id = ${userId}
-    `;
-
-    if (existing.length > 0) {
-      return NextResponse.json({ 
-        error: existing[0].status === 'approved' ? 'Already a member' : 'Request already pending' 
-      }, { status: 400 });
-    }
-
-        // Get user's name from Clerk (fallback to 'New Member')
-        let userName = 'New Member';
-    try {
-      const { clerkClient } = await import('@clerk/nextjs/server');
-      const client = await clerkClient();
-      const clerkUser = await client.users.getUser(userId);
-      userName = clerkUser.firstName || clerkUser.username || 'New Member';
-    } catch (error) {
-      console.error('Failed to fetch user name:', error);
-    }
-
+    // 3. Add user as pending member
     await sql`
-      INSERT INTO squad_members (squad_id, user_id, user_name, role, status)
-      VALUES (${squad[0].id}, ${userId}, ${userName}, 'member', 'pending')
-    `;
-    // 🎉 Notify the leader with a join request message (visible in chat)
-    await sql`
-      INSERT INTO squad_messages (squad_id, sender_id, sender_name, content, status, is_system_message)
-      VALUES (
-        ${squad[0].id}, 
-        ${userId}, 
-        ${userName}, 
-        ${`👋 ${userName} is requesting to join the squad!`}, 
-        'sent', 
-        true
-      )
+      INSERT INTO squad_members (squad_id, user_id, role, status, joined_at)
+      VALUES (${squadId}, ${userId}, 'member', 'pending', NOW())
     `;
 
-    return NextResponse.json({ success: true, message: 'Request sent' });
+    return NextResponse.json({ success: true, message: 'Join request sent!' });
   } catch (error: any) {
-    console.error('Join Squad Error:', error.message);
+    console.error('Join squad error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

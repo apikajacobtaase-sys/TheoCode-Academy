@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'source.unsplash.com' },
       { protocol: 'https', hostname: 'utfs.io' },
       { protocol: 'https', hostname: 'img.clerk.com' },
+      // 🎯 ADD THIS LINE FOR UPLOADTHING CDN IMAGES
+      { protocol: 'https', hostname: '*.ufs.sh' },
     ],
   },
   experimental: {
@@ -14,7 +16,6 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '10mb',
     },
   },
-  // 🎯 ADD THIS BLOCK TO BYPASS STRICT TS CHECKS ON VERCEL
   typescript: {
     ignoreBuildErrors: true,
   },

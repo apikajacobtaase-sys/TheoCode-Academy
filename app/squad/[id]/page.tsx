@@ -1,9 +1,7 @@
 'use client';
-
-import { useState, useEffect, useRef } from 'react';
-import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { useUser } from '@clerk/nextjs';
+import Image from 'next/image'; // 🎯 ADD THIS LINE!
+import { useParams } from 'next/navigation';
 import { useSquadChat } from '@/lib/useSquadChat';
 import MessageBubble from '@/components/chat/MessageBubble';
 import ImagePreview from '@/components/chat/ImagePreview';
@@ -12,9 +10,13 @@ import AttachmentMenu from '@/components/chat/AttachmentMenu';
 import EditSquadDrawer from '@/components/EditSquadDrawer';
 import { compressImage, fileToBase64, needsDateSeparator, formatDateSeparator } from '@/lib/chatUtils';
 import { useTypingIndicator } from '@/lib/useTypingIndicator';
+import { useUser } from '@clerk/nextjs';
+import { useToast } from '@/components/Toast'; // 🎯 ADD THIS LINE
+import { useState, useEffect, useRef } from 'react';
 export default function SquadChatPage() {
   const { id: squadId } = useParams();
   const { user, isLoaded } = useUser();
+  const { showToast } = useToast(); 
   
    const { messages, initialLoading, error, sendMessage, refetch } = useSquadChat(
      squadId as string, 
@@ -76,6 +78,13 @@ export default function SquadChatPage() {
     window.addEventListener('refresh-squad-chat', handleRefresh);
     return () => window.removeEventListener('refresh-squad-chat', handleRefresh);
   }, [refetch]);
+
+    const handleCopyInvite = () => {
+    // Copies the discover page link (or you can use a specific invite code if you have one)
+    const inviteLink = `${window.location.origin}/squad/discover`;
+    navigator.clipboard.writeText(inviteLink);
+    showToast('success', '🔗 Discover link copied to clipboard!', 3000);
+  };
 
   const handleSend = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -166,10 +175,20 @@ export default function SquadChatPage() {
           ←
         </Link>
         
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-lg font-bold text-white flex-shrink-0">
-          {(squad?.name || 'S')[0].toUpperCase()}
-        </div>
-        
+               {/* 🎯 FIXED: Show image if it exists, otherwise show initials */}
+        {squad?.image_url ? (
+          <Image 
+            src={squad.image_url} 
+            alt={squad.name || 'Squad'} 
+            width={40} 
+            height={40} 
+            className="w-10 h-10 rounded-full object-cover flex-shrink-0 border border-gray-700"
+          />
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-lg font-bold text-white flex-shrink-0">
+            {(squad?.name || 'S')[0].toUpperCase()}
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           <h1 className="text-base font-semibold text-white truncate">{squad?.name || 'Squad Chat'}</h1>
           {/* 🎯 FIXED: Using members.length instead of member_count */}
@@ -178,20 +197,33 @@ export default function SquadChatPage() {
           </p>
         </div>
 
-        {/* 🎯 WHATSAPP-STYLE EDIT BUTTON: Opens drawer, allows owner OR leader */}
-        {(squad?.role === 'owner' || squad?.role === 'leader') && (
+                {/* 🎯 WHATSAPP-STYLE ACTION BUTTONS */}
+        <div className="flex items-center gap-2">
+          {(squad?.role === 'owner' || squad?.role === 'leader') && (
+            <button
+              onClick={() => setShowEditDrawer(true)}
+              className="p-2 text-gray-400 hover:text-green-400 transition"
+              title="Edit Squad"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </button>
+          )}
+          
+          {/* 🎯 NEW: Invite Button */}
           <button
-            onClick={() => setShowEditDrawer(true)}
-            className="p-2 text-gray-400 hover:text-green-400 transition"
-            title="Edit Squad"
+            onClick={handleCopyInvite}
+            className="p-2 text-gray-400 hover:text-purple-400 transition"
+            title="Invite Friends"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
             </svg>
           </button>
-        )}
 
-        <button className="p-2 text-gray-400 hover:text-green-400 transition">🔍</button>
+          <button className="p-2 text-gray-400 hover:text-green-400 transition">🔍</button>
+        </div>
         <button className="p-2 text-gray-400 hover:text-green-400 transition">⋮</button>
       </div>
 
@@ -369,7 +401,57 @@ export default function SquadChatPage() {
           )}
         </button>
       </div>
-
+         {/* 🎯 PENDING REQUESTS (For Owners/Leaders Only) */}
+{(squad?.role === 'owner' || squad?.role === 'leader') && squad?.pending_requests?.length > 0 && (
+  <div className="mt-8 pt-8 border-t border-gray-800">
+    <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+      📬 Pending Join Requests ({squad.pending_requests.length})
+    </h3>
+    <div className="space-y-3">
+      {squad.pending_requests.map((req: any) => (
+        <div key={req.user_id} className="flex items-center justify-between bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center font-bold text-sm">
+              {req.user_name?.charAt(0).toUpperCase() || 'U'}
+            </div>
+            <div>
+              <p className="font-bold text-white">{req.user_name || 'Unknown User'}</p>
+              <p className="text-xs text-gray-500">Requested {new Date(req.joined_at).toLocaleDateString()}</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button 
+              onClick={async () => {
+                await fetch(`/api/squads/${squad.id}/members/${req.user_id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ action: 'reject' })
+                });
+                window.location.reload(); // Simple reload to update list
+              }}
+              className="px-3 py-1.5 bg-red-900/30 text-red-400 border border-red-500/30 rounded-lg text-sm font-bold hover:bg-red-900/50 transition"
+            >
+              Reject
+            </button>
+            <button 
+              onClick={async () => {
+                await fetch(`/api/squads/${squad.id}/members/${req.user_id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ action: 'approve' })
+                });
+                window.location.reload();
+              }}
+              className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-500 transition"
+            >
+              Approve
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
       {previewImage && <ImagePreview src={previewImage} onClose={() => setPreviewImage(null)} />}
 
       {/* 🎯 WHATSAPP-STYLE EDIT DRAWER */}

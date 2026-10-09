@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { UploadButton } from "@uploadthing/react";
-
+import { UploadButton } from "@/lib/uploadthing"; // ✅ This has the generics already bound!
 interface EditSquadDrawerProps {
   squadId: string;
   isOpen: boolean;
@@ -109,7 +108,7 @@ export default function EditSquadDrawer({
           </div>
 
           {/* Form Content */}
-          <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-5 py-6 space-y-6">
+         <form id="edit-squad-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-5 py-6 space-y-6">
             {/* Image Upload */}
             <div>
               <label className="block text-sm font-bold text-white mb-3">Squad Image</label>
@@ -129,7 +128,7 @@ export default function EditSquadDrawer({
                   <UploadButton
                     endpoint="imageUploader"
                     onClientUploadComplete={(res) => {
-                      if (res && res[0]) setImageUrl(res[0].url);
+                     if (res && res[0]) setImageUrl(res[0].ufsUrl);
                     }}
                     onUploadError={(error: Error) => setError(`Upload failed: ${error.message}`)}
                     className="ut-button:bg-green-600 ut-button:hover:bg-green-500 ut-button:text-white ut-button:text-sm ut-button:py-2 ut-button:px-3 ut-button:rounded-lg"
@@ -202,11 +201,12 @@ export default function EditSquadDrawer({
               Cancel
             </button>
             {/* 🎯 FIXED: type="submit" triggers the form's onSubmit, which has e.preventDefault() */}
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-500 disabled:bg-gray-700 text-white rounded-xl font-bold transition"
-            >
+           <button
+  type="submit"
+  form="edit-squad-form"
+  disabled={saving}
+  className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-500 disabled:bg-gray-700 text-white rounded-xl font-bold transition"
+>
               {saving ? 'Saving...' : 'Save'}
             </button>
           </div>

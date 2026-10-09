@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 import { neon } from '@neondatabase/serverless';
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
@@ -9,7 +12,6 @@ export async function GET(
   try {
     const { username } = await params;
     const { userId: currentUserId } = await auth();
-
     const sql = neon(process.env.DATABASE_URL!);
 
     // 1. Fetch the profile
@@ -24,26 +26,24 @@ export async function GET(
     const p = profile[0];
     const isOwner = currentUserId === p.user_id;
 
-    // 2. Calculate stats
+    // 🎯 2. Calculate stats from challenge_submissions (NOT challenge_progress!)
     const stats = await sql`
       SELECT 
-        COALESCE(SUM(c.points), 0) as total_points,
-        COUNT(DISTINCT cp.challenge_id) as challenges_solved
-      FROM challenge_progress cp
-      JOIN challenges c ON cp.challenge_id = c.id
-      WHERE cp.user_id = ${p.user_id} AND cp.status = 'solved'
+        COALESCE(SUM(earned_points), 0) as total_points,
+        COUNT(DISTINCT challenge_id) as challenges_solved
+      FROM challenge_submissions
+      WHERE user_id = ${p.user_id} AND status = 'accepted'
     `;
 
-    // 3. Calculate global rank
+    // 🎯 3. Calculate global rank from challenge_submissions
     const rankResult = await sql`
       SELECT COUNT(*) + 1 as rank
       FROM (
-        SELECT cp.user_id, SUM(c.points) as total
-        FROM challenge_progress cp
-        JOIN challenges c ON cp.challenge_id = c.id
-        WHERE cp.status = 'solved'
-        GROUP BY cp.user_id
-        HAVING SUM(c.points) > ${stats[0].total_points}
+        SELECT user_id, SUM(earned_points) as total
+        FROM challenge_submissions
+        WHERE status = 'accepted'
+        GROUP BY user_id
+        HAVING SUM(earned_points) > ${stats[0].total_points}
       ) as higher
     `;
 
@@ -56,27 +56,35 @@ export async function GET(
       LIMIT 10
     `;
 
-    // 5. Fetch recent activity (last 5 solved challenges)
+    // 🎯 5. Fetch recent activity from challenge_submissions
     const recentActivity = await sql`
-      SELECT c.title, c.difficulty, c.points, cp.solved_at
-      FROM challenge_progress cp
-      JOIN challenges c ON cp.challenge_id = c.id
-      WHERE cp.user_id = ${p.user_id} AND cp.status = 'solved'
-      ORDER BY cp.solved_at DESC
+      SELECT c.title, c.difficulty, cs.earned_points as points, cs.submitted_at as solved_at
+      FROM challenge_submissions cs
+      JOIN challenges c ON cs.challenge_id = c.id
+      WHERE cs.user_id = ${p.user_id} AND cs.status = 'accepted'
+      ORDER BY cs.submitted_at DESC
       LIMIT 5
     `;
 
-    return NextResponse.json({
+    const response = {
       success: true,
       isOwner,
       profile: p,
       stats: {
-        totalPoints: parseInt(stats[0].total_points) || 0,
-        challengesSolved: parseInt(stats[0].challenges_solved) || 0,
-        globalRank: parseInt(rankResult[0].rank) || 0
+        totalPoints: Number(stats[0].total_points) || 0,
+        challengesSolved: Number(stats[0].challenges_solved) || 0,
+        globalRank: Number(rankResult[0].rank) || 1
       },
       squads,
       recentActivity
+    };
+
+    return NextResponse.json(response, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      }
     });
 
   } catch (error: any) {

@@ -1,102 +1,92 @@
 'use client';
 
-import { useRef } from 'react';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
+import Image from 'next/image';
 
 interface CertificateProps {
   userName: string;
   courseTitle: string;
   certificateNumber: string;
   issuedAt: string;
-  instructorName?: string;
+  instructorName: string;
 }
 
 export default function Certificate({ 
   userName, 
   courseTitle, 
   certificateNumber, 
-  issuedAt,
-  instructorName = 'TheCode Academy'
+  issuedAt, 
+  instructorName 
 }: CertificateProps) {
-  const certRef = useRef<HTMLDivElement>(null);
-
-  const downloadCertificate = async () => {
-    if (!certRef.current) return;
-
-    try {
-      const canvas = await html2canvas(certRef.current, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-      });
-
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'px',
-        format: [canvas.width, canvas.height]
-      });
-
-      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-      pdf.save(`Certificate-${certificateNumber}.pdf`);
-    } catch (error) {
-      console.error('Failed to generate PDF:', error);
-      alert('Failed to download certificate');
-    }
-  };
-
   return (
-    <div className="space-y-4">
-      {/* Certificate Preview */}
-      <div
-        ref={certRef}
-        className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border-8 border-double border-yellow-500 p-12 text-center relative overflow-hidden"
-        style={{ width: '1000px', height: '700px' }}
-      >
-        {/* Decorative corners */}
-        <div className="absolute top-4 left-4 w-16 h-16 border-t-4 border-l-4 border-yellow-500"></div>
-        <div className="absolute top-4 right-4 w-16 h-16 border-t-4 border-r-4 border-yellow-500"></div>
-        <div className="absolute bottom-4 left-4 w-16 h-16 border-b-4 border-l-4 border-yellow-500"></div>
-        <div className="absolute bottom-4 right-4 w-16 h-16 border-b-4 border-r-4 border-yellow-500"></div>
+    // 🎯 RESPONSIVE CONTAINER: Full width on mobile, max-width on desktop
+    <div className="w-full max-w-3xl mx-auto bg-gradient-to-br from-white to-gray-100 text-gray-900 rounded-xl shadow-2xl border-4 border-double border-yellow-600/50 p-6 md:p-12 relative overflow-hidden">
+      
+      {/* Decorative Corner Accents */}
+      <div className="absolute top-2 left-2 w-8 h-8 border-t-4 border-l-4 border-yellow-600 rounded-tl-lg" />
+      <div className="absolute top-2 right-2 w-8 h-8 border-t-4 border-r-4 border-yellow-600 rounded-tr-lg" />
+      <div className="absolute bottom-2 left-2 w-8 h-8 border-b-4 border-l-4 border-yellow-600 rounded-bl-lg" />
+      <div className="absolute bottom-2 right-2 w-8 h-8 border-b-4 border-r-4 border-yellow-600 rounded-br-lg" />
 
-        {/* Content */}
-        <div className="relative z-10 flex flex-col items-center justify-center h-full">
-          <p className="text-yellow-500 text-sm uppercase tracking-widest mb-4">Certificate of Completion</p>
-          <h1 className="text-5xl font-bold text-white mb-8 bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">
-            TheCode Academy
+      <div className="text-center space-y-4 md:space-y-6">
+        {/* Header */}
+        <div className="space-y-2">
+          <p className="text-yellow-700 font-bold tracking-[0.2em] uppercase text-xs md:text-sm">
+            Certificate of Completion
+          </p>
+          <h1 className="text-3xl md:text-5xl font-serif font-bold text-gray-900">
+            The Code Academy
           </h1>
+        </div>
+
+        {/* Body */}
+        <div className="space-y-3 md:space-y-4">
+          <p className="text-gray-600 text-sm md:text-base italic">
+            This is to certify that
+          </p>
           
-          <p className="text-gray-400 text-lg mb-2">This is to certify that</p>
-          <h2 className="text-4xl font-bold text-white mb-6">{userName}</h2>
+          {/* 🎯 RESPONSIVE NAME: Scales down on mobile */}
+          <h2 className="text-2xl md:text-4xl font-bold text-yellow-700 border-b-2 border-yellow-600/30 pb-2 inline-block px-4">
+            {userName}
+          </h2>
           
-          <p className="text-gray-400 text-lg mb-2">has successfully completed the course</p>
-          <h3 className="text-3xl font-bold text-green-400 mb-8">{courseTitle}</h3>
+          <p className="text-gray-600 text-sm md:text-base">
+            has successfully completed the course
+          </p>
           
-          <div className="flex items-center gap-12 mt-8">
-            <div className="text-center">
-              <p className="text-gray-500 text-sm">Issued</p>
-              <p className="text-white font-bold">{new Date(issuedAt).toLocaleDateString()}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-gray-500 text-sm">Certificate No.</p>
-              <p className="text-white font-bold font-mono text-sm">{certificateNumber}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-gray-500 text-sm">Instructor</p>
-              <p className="text-white font-bold">{instructorName}</p>
-            </div>
+          {/* 🎯 RESPONSIVE COURSE TITLE */}
+          <h3 className="text-xl md:text-3xl font-bold text-gray-900 px-2">
+            "{courseTitle}"
+          </h3>
+        </div>
+
+        {/* Footer / Signatures */}
+        <div className="pt-6 md:pt-10 grid grid-cols-2 gap-4 md:gap-12 text-center">
+          <div className="space-y-2">
+            <div className="h-px bg-gray-400 w-2/3 mx-auto" />
+            <p className="text-xs md:text-sm font-bold text-gray-700">{instructorName}</p>
+            <p className="text-[10px] md:text-xs text-gray-500 uppercase tracking-wider">Instructor</p>
+          </div>
+          
+          <div className="space-y-2">
+            <div className="h-px bg-gray-400 w-2/3 mx-auto" />
+            <p className="text-xs md:text-sm font-bold text-gray-700">
+              {new Date(issuedAt).toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}
+            </p>
+            <p className="text-[10px] md:text-xs text-gray-500 uppercase tracking-wider">Date Issued</p>
           </div>
         </div>
-      </div>
 
-      {/* Download Button */}
-      <button
-        onClick={downloadCertificate}
-        className="w-full py-3 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 rounded-lg font-bold transition flex items-center justify-center gap-2 shadow-lg"
-      >
-        📥 Download Certificate (PDF)
-      </button>
+        {/* Certificate Number */}
+        <div className="pt-4 md:pt-6">
+          <p className="text-[10px] md:text-xs text-gray-400 font-mono">
+            Certificate ID: {certificateNumber}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

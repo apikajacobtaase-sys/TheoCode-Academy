@@ -13,6 +13,7 @@ interface Squad {
   user_role: string;
   member_status: string;
   created_at: string;
+  image_url?: string; // 🎯 Added to match your database
 }
 
 export default function SquadsPage() {
@@ -58,41 +59,31 @@ export default function SquadsPage() {
 
   return (
     <main className="min-h-screen bg-black text-white">
-      {/* 🎯 1. HERO SECTION */}
-      <div className="relative py-16 px-4 sm:px-8 border-b border-gray-800 overflow-hidden">
-        {/* Background Image with Overlay */}
-        <div className="absolute inset-0 z-0">
-          <Image
-            src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1600&q=80"
-            alt="Team collaboration"
-            fill
-            className="object-cover opacity-20"
-            priority
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent" />
-        </div>
+      {/* 🎯 1. HERO SECTION (Cleaned up) */}
+                <div className="flex flex-col sm:flex-row gap-4">
+            {/* 🎯 NEW: Discover Squads Button */}
+            <Link
+              href="/squad/discover"
+              className="group flex items-center justify-center gap-2 px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white border border-gray-700 rounded-xl font-bold transition-all duration-300 hover:scale-105 whitespace-nowrap"
+            >
+              <svg className="w-5 h-5 text-purple-400 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
+              </svg>
+              Discover Squads
+            </Link>
 
-        <div className="relative z-10 max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-          <div>
-            <h1 className="text-4xl sm:text-5xl font-extrabold mb-3 bg-gradient-to-r from-green-400 to-purple-500 bg-clip-text text-transparent">
-              Your Squads
-            </h1>
-            <p className="text-gray-400 text-lg max-w-xl">
-              Collaborate, share knowledge, and level up your coding skills together with your team.
-            </p>
+            {/* Existing: Create New Squad Button */}
+            <Link
+              href="/squad/create"
+              className="group flex items-center justify-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(34,197,94,0.4)] whitespace-nowrap"
+            >
+              <svg className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Create New Squad
+            </Link>
           </div>
-          
-          <Link
-            href="/squad/create"
-            className="group flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(34,197,94,0.4)] whitespace-nowrap"
-          >
-            <svg className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Create New Squad
-          </Link>
-        </div>
-      </div>
 
       {/* 🎯 2. SQUADS GRID */}
       <div className="max-w-7xl mx-auto px-4 sm:px-8 py-12">
@@ -118,7 +109,7 @@ export default function SquadsPage() {
             </div>
           </div>
         ) : (
-          /* 🎯 SQUADS GRID */
+          /* 🎯 SQUADS GRID WITH FALLBACK IMAGE */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {squads.map((squad) => (
               <Link
@@ -129,12 +120,11 @@ export default function SquadsPage() {
                 {/* Card Header Image */}
                 <div className="relative h-32 w-full bg-gray-800 overflow-hidden">
                   <Image
-                    src={`https://source.unsplash.com/random/800x400/?coding,team,${squad.name}`}
+                    // 🎯 MAGIC FALLBACK: Use squad image if it exists, otherwise use your local file
+                    src={squad.image_url || '/images/squadCard.jpg'}
                     alt={squad.name}
                     fill
                     className="object-cover group-hover:scale-110 transition-transform duration-500"
-                    // Fallback if source.unsplash is slow, replace with local images later:
-                    // src="/images/default-squad.jpg"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent" />
                   
