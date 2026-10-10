@@ -81,15 +81,18 @@ export async function POST(
 
     const compilerId = COMPILER_MAP[language || 'C++'] || 'g++-15';
 
-    const executeProviderCode = async (sourceCode: string, input: string = ''): Promise<ExecutionResult> => {
-      // 🎯 CRITICAL FIX: Only include 'input' if it actually has content
+      const executeProviderCode = async (sourceCode: string, input: any = ''): Promise<ExecutionResult> => {
+      // 🎯 BULLETPROOF FIX: Safely convert ANY input type to a trimmed string
+      const inputStr = (input === null || input === undefined) ? '' : String(input).trim();
+      
       const payload: any = {
         compiler: compilerId,
         code: sourceCode,
       };
       
-      if (input && input.trim() !== '') {
-        payload.input = input;
+      // Only include 'input' if it actually has content
+      if (inputStr !== '') {
+        payload.input = inputStr;
       }
 
       console.log('📤 SENDING TO API:', JSON.stringify(payload, null, 2));

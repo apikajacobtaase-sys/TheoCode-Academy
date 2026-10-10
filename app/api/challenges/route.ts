@@ -1,61 +1,43 @@
-import { auth } from '@clerk/nextjs/server';
-import { neon } from '@neondatabase/serverless';
 import { NextResponse } from 'next/server';
+import { currentUser } from '@clerk/nextjs/server';
+import { neon } from '@neondatabase/serverless';
 
-// GET: Fetch all challenges with user's progress
 export async function GET() {
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
+    const user = await currentUser();
     const sql = neon(process.env.DATABASE_URL!);
 
-    // Fetch all active challenges with user's progress
+    // Fetch all challenges
     const challenges = await sql`
-      SELECT 
-        c.id,
-        c.title,
-        c.description,
-        c.category,
-        c.difficulty,
-        c.points,
-        c.language,
-        c.is_active,
-        COALESCE(cp.status, 'not_started') as user_status,
-        cp.solved_at,
-        cp.attempts
-      FROM challenges c
-      LEFT JOIN challenge_progress cp ON c.id = cp.challenge_id AND cp.user_id = ${userId}
-      WHERE c.is_active = true
-      ORDER BY 
-        CASE c.difficulty 
-          WHEN 'easy' THEN 1 
-          WHEN 'medium' THEN 2 
-          WHEN 'hard' THEN 3 
-        END,
-        c.points ASC
+      SELECT id, title, description, difficulty, points, language, category, created_at
+      FROM challenges
+      ORDER BY created_at DESC
     `;
 
-    // Calculate user stats
-    const solved = challenges.filter((c: any) => c.user_status === 'solved');
-    const totalPoints = solved.reduce((sum: number, c: any) => sum + (c.points || 0), 0);
+    // If signed in, fetch user progress
+    let progressMap: Record<string, string> = {};
+    if (user) {
+      const progress = await sql`
+        SELECT challenge_id, status
+        FROM challenge_progress
+        WHERE user_id = ${user.id}
+      `;
+      progress.forEach((p: any) => {
+        progressMap[p.challenge_id] = p.status;
+      });
+    }
 
-    const stats = {
-      totalChallenges: challenges.length,
-      solved: solved.length,
-      inProgress: challenges.filter((c: any) => c.user_status === 'in_progress').length,
-      totalPoints,
-    };
+    const enriched = challenges.map((c: any) => ({
+      ...c,
+      user_status: progressMap[c.id] || null,
+    }));
 
-    return NextResponse.json({
-      success: true,
-      challenges,
-      stats,
-    });
+    return NextResponse.json({ success: true, challenges: enriched });
   } catch (error: any) {
-    console.error('❌ Challenges API Error:', error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('❌ List Challenges Error:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch challenges', details: error.message },
+      { status: 500 }
+    );
   }
 }
